@@ -50,6 +50,12 @@ def migrate(conninfo: str) -> list[str]:
     return applied_now
 
 
+def wipe_documents(conninfo: str) -> None:
+    """Delete every document and chunk. Only for disposable databases (tests, benchmarks)."""
+    with psycopg.connect(conninfo, autocommit=True) as conn:
+        conn.execute("TRUNCATE documents, chunks CASCADE")
+
+
 def main() -> None:
     settings = get_settings()
     configure_logging(settings.log_level, json_output=settings.log_json)

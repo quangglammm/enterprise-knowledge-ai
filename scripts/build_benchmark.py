@@ -1,0 +1,815 @@
+"""Build corpus v1's manifest and benchmark v1's labelled questions (EVAL-01, ADR-0011).
+
+    uv run python scripts/build_benchmark.py
+
+This file is the authoring source. Each question's evidence is written as (document, short
+quote from that document); the builder chunks the served version of each document with
+the recorded chunking settings and writes, as the relevance label, every chunk whose text
+contains the quote. The published dataset is scored on those chunk IDs only. If chunking
+settings change, rerun this into a new dataset version instead of editing v1.
+"""
+
+# Questions and answers are natural-language data; splitting them only hurts review.
+# ruff: noqa: E501
+
+import hashlib
+import json
+import re
+import sys
+import unicodedata
+from pathlib import Path
+from typing import Any
+
+from enterprise_knowledge.domain.ids import DocumentId, chunk_id_for
+from enterprise_knowledge.evaluation.benchmark import load_benchmark, load_corpus
+from enterprise_knowledge.ingestion.chunking import ChunkingSettings
+from enterprise_knowledge.ingestion.prepare import prepare_document
+
+ROOT = Path(__file__).resolve().parents[1]
+CORPUS = ROOT / "datasets" / "corpus" / "v1"
+BENCHMARK = ROOT / "datasets" / "benchmark" / "v1"
+CHUNKING = ChunkingSettings()  # the ingestion defaults: 1200 characters, 150 overlap
+SOURCE = "synthetic: authored for this repository (fictional companies)"
+LICENSE = "same as this repository"
+
+BAMBOO, LOTUS = "bamboo-harbor", "lotus-retail"
+# (id, version, tenant, title, language, format, file, allowed groups); v1 before v2.
+MANIFEST: list[tuple[str, int, str, str, str, str, str, list[str]]] = [
+    (
+        "hr-leave-policy",
+        1,
+        BAMBOO,
+        "Quy chế nghỉ phép",
+        "vi",
+        "pdf",
+        "hr-leave-policy-v1.pdf",
+        ["all-staff"],
+    ),
+    (
+        "hr-leave-policy",
+        2,
+        BAMBOO,
+        "Quy chế nghỉ phép (sửa đổi năm 2026)",
+        "vi",
+        "md",
+        "hr-leave-policy-v2.md",
+        ["all-staff"],
+    ),
+    (
+        "it-vpn-runbook",
+        1,
+        BAMBOO,
+        "VPN access runbook",
+        "en",
+        "docx",
+        "it-vpn-runbook.docx",
+        ["all-staff"],
+    ),
+    (
+        "hr-handbook",
+        1,
+        BAMBOO,
+        "Sổ tay nhân viên - Employee Handbook",
+        "mixed",
+        "html",
+        "hr-handbook.html",
+        ["all-staff"],
+    ),
+    (
+        "hr-onboarding",
+        1,
+        BAMBOO,
+        "Hướng dẫn hội nhập nhân viên mới",
+        "vi",
+        "md",
+        "hr-onboarding.md",
+        ["all-staff"],
+    ),
+    (
+        "hr-expense-policy",
+        1,
+        BAMBOO,
+        "Quy định công tác phí",
+        "vi",
+        "md",
+        "hr-expense-policy-v1.md",
+        ["all-staff"],
+    ),
+    (
+        "hr-expense-policy",
+        2,
+        BAMBOO,
+        "Quy định công tác phí (cập nhật tháng 7 năm 2026)",
+        "vi",
+        "md",
+        "hr-expense-policy-v2.md",
+        ["all-staff"],
+    ),
+    (
+        "hr-remote-work",
+        1,
+        BAMBOO,
+        "Chính sách làm việc từ xa",
+        "vi",
+        "md",
+        "hr-remote-work.md",
+        ["all-staff"],
+    ),
+    (
+        "hr-salary-review",
+        1,
+        BAMBOO,
+        "Quy trình xét tăng lương",
+        "vi",
+        "md",
+        "hr-salary-review.md",
+        ["hr", "managers"],
+    ),
+    (
+        "hr-disciplinary",
+        1,
+        BAMBOO,
+        "Quy trình xử lý kỷ luật lao động",
+        "vi",
+        "md",
+        "hr-disciplinary.md",
+        ["hr"],
+    ),
+    (
+        "mgr-performance-review",
+        1,
+        BAMBOO,
+        "Hướng dẫn đánh giá hiệu suất dành cho quản lý",
+        "vi",
+        "md",
+        "mgr-performance-review.md",
+        ["managers"],
+    ),
+    (
+        "hr-insurance-benefits",
+        1,
+        BAMBOO,
+        "Phúc lợi bảo hiểm và sức khỏe",
+        "vi",
+        "html",
+        "hr-insurance-benefits.html",
+        ["all-staff"],
+    ),
+    (
+        "sec-password-standard",
+        1,
+        BAMBOO,
+        "Password and Authentication Standard",
+        "en",
+        "md",
+        "sec-password-standard.md",
+        ["all-staff"],
+    ),
+    (
+        "sec-incident-response",
+        1,
+        BAMBOO,
+        "Security Incident Response Procedure",
+        "en",
+        "md",
+        "sec-incident-response.md",
+        ["security"],
+    ),
+    (
+        "sec-data-classification",
+        1,
+        BAMBOO,
+        "Data Classification Policy",
+        "en",
+        "md",
+        "sec-data-classification.md",
+        ["all-staff"],
+    ),
+    (
+        "eng-oncall-runbook",
+        1,
+        BAMBOO,
+        "Engineering On-call Runbook",
+        "en",
+        "md",
+        "eng-oncall-runbook.md",
+        ["engineering"],
+    ),
+    (
+        "eng-deploy-guide",
+        1,
+        BAMBOO,
+        "Production Deployment Guide",
+        "en",
+        "md",
+        "eng-deploy-guide-v1.md",
+        ["engineering"],
+    ),
+    (
+        "eng-deploy-guide",
+        2,
+        BAMBOO,
+        "Production Deployment Guide (revision 2)",
+        "en",
+        "md",
+        "eng-deploy-guide-v2.md",
+        ["engineering"],
+    ),
+    (
+        "it-laptop-policy",
+        1,
+        BAMBOO,
+        "Laptop and Device Policy",
+        "en",
+        "md",
+        "it-laptop-policy.md",
+        ["all-staff"],
+    ),
+    (
+        "it-guest-wifi",
+        1,
+        BAMBOO,
+        "Hướng dẫn sử dụng Wi-Fi cho khách",
+        "vi",
+        "md",
+        "it-guest-wifi.md",
+        ["all-staff"],
+    ),
+    (
+        "ops-warehouse-safety",
+        1,
+        BAMBOO,
+        "Nội quy an toàn kho vận",
+        "vi",
+        "md",
+        "ops-warehouse-safety.md",
+        ["all-staff"],
+    ),
+    (
+        "ops-shipping-sla",
+        1,
+        BAMBOO,
+        "Delivery Service Levels",
+        "en",
+        "md",
+        "ops-shipping-sla.md",
+        ["all-staff"],
+    ),
+    (
+        "hr-faq-bilingual",
+        1,
+        BAMBOO,
+        "Câu hỏi thường gặp về nhân sự / HR FAQ",
+        "mixed",
+        "md",
+        "hr-faq-bilingual.md",
+        ["all-staff"],
+    ),
+    (
+        "lotus-leave-policy",
+        1,
+        LOTUS,
+        "Quy chế nghỉ phép - Lotus Retail",
+        "vi",
+        "md",
+        "lotus-leave-policy.md",
+        ["all-staff"],
+    ),
+]
+
+STAFF = {"tenant": BAMBOO, "groups": ["all-staff"]}
+HR = {"tenant": BAMBOO, "groups": ["all-staff", "hr"]}
+MANAGER = {"tenant": BAMBOO, "groups": ["all-staff", "managers"]}
+SECURITY = {"tenant": BAMBOO, "groups": ["all-staff", "security"]}
+ENGINEER = {"tenant": BAMBOO, "groups": ["all-staff", "engineering"]}
+LOTUS_STAFF = {"tenant": LOTUS, "groups": ["all-staff"]}
+
+VI, EN, X = "vietnamese", "english", "cross-lingual"
+MULTI, VERSION, ACCESS, TENANT, NONE = (
+    "multi-document",
+    "version-sensitive",
+    "access-sensitive",
+    "tenant-isolation",
+    "unanswerable",
+)
+
+Quote = tuple[str, str]  # (document id, short quote from its served version)
+Group = list[Quote]  # any one alternative supplies this piece of evidence
+
+# (language, types, principal, question, evidence groups, reference answer)
+QUESTIONS: list[tuple[str, list[str], dict[str, Any], str, list[Group], str | None]] = [
+    # Vietnamese
+    (
+        "vi",
+        [VI, VERSION],
+        STAFF,
+        "Nhân viên được phụ cấp ăn uống bao nhiêu mỗi ngày khi đi công tác?",
+        [[("hr-expense-policy", "phụ cấp ăn uống 300.000 đồng")]],
+        "300.000 đồng cho mỗi ngày công tác.",
+    ),
+    (
+        "vi",
+        [VI, VERSION],
+        STAFF,
+        "Chi phí khách sạn tối đa mỗi đêm khi đi công tác ở Hà Nội là bao nhiêu?",
+        [[("hr-expense-policy", "tối đa 1.500.000 đồng mỗi đêm tại Hà Nội")]],
+        "Tối đa 1.500.000 đồng mỗi đêm.",
+    ),
+    (
+        "vi",
+        [VI],
+        STAFF,
+        "Phải nộp hồ sơ quyết toán công tác phí trong thời hạn bao lâu?",
+        [[("hr-expense-policy", "trong vòng 10 ngày làm việc sau khi kết thúc chuyến công tác")]],
+        "Trong vòng 10 ngày làm việc sau khi kết thúc chuyến công tác.",
+    ),
+    (
+        "vi",
+        [VI],
+        STAFF,
+        "Nhân viên văn phòng được làm việc từ xa tối đa mấy ngày mỗi tuần?",
+        [
+            [
+                ("hr-remote-work", "tối đa 2 ngày mỗi tuần"),
+                ("hr-faq-bilingual", "tối đa 2 ngày mỗi tuần"),
+            ]
+        ],
+        "Tối đa 2 ngày mỗi tuần.",
+    ),
+    (
+        "vi",
+        [VI],
+        STAFF,
+        "Nhân viên làm việc từ xa được hỗ trợ tiền internet bao nhiêu?",
+        [[("hr-remote-work", "hỗ trợ chi phí internet 200.000 đồng mỗi tháng")]],
+        "200.000 đồng mỗi tháng, nếu làm việc từ xa từ 4 ngày trở lên trong tháng.",
+    ),
+    (
+        "vi",
+        [VI],
+        STAFF,
+        "Nhân viên mới được cấp tài khoản email khi nào?",
+        [[("hr-onboarding", "được cấp trong ngày làm việc đầu tiên")]],
+        "Trong ngày làm việc đầu tiên.",
+    ),
+    (
+        "vi",
+        [VI],
+        STAFF,
+        "Hạn mức bảo hiểm điều trị nội trú là bao nhiêu?",
+        [[("hr-insurance-benefits", "Hạn mức điều trị nội trú là 100 triệu đồng mỗi năm")]],
+        "100 triệu đồng mỗi năm.",
+    ),
+    (
+        "vi",
+        [VI],
+        STAFF,
+        "Lao động nam được nghỉ mấy ngày khi vợ sinh con?",
+        [[("hr-insurance-benefits", "Lao động nam được nghỉ 5 ngày làm việc")]],
+        "5 ngày làm việc hưởng nguyên lương, 7 ngày nếu vợ sinh con phải phẫu thuật.",
+    ),
+    (
+        "vi",
+        [VI],
+        STAFF,
+        "Tốc độ tối đa của xe nâng trong kho là bao nhiêu?",
+        [[("ops-warehouse-safety", "không vượt quá 10 km/h")]],
+        "Không vượt quá 10 km/h.",
+    ),
+    (
+        "vi",
+        [VI],
+        STAFF,
+        "Sự cố an toàn trong kho phải báo cáo cho ai và trong bao lâu?",
+        [[("ops-warehouse-safety", "phải được báo cáo cho trưởng kho trong vòng 24 giờ")]],
+        "Báo cáo cho trưởng kho trong vòng 24 giờ.",
+    ),
+    (
+        "vi",
+        [VI],
+        STAFF,
+        "Mật khẩu Wi-Fi dành cho khách lấy ở đâu?",
+        [[("it-guest-wifi", "được cung cấp tại quầy lễ tân")]],
+        "Tại quầy lễ tân; mật khẩu đổi hàng tuần.",
+    ),
+    (
+        "vi",
+        [VI],
+        STAFF,
+        "Lương được trả vào ngày nào trong tháng?",
+        [[("hr-faq-bilingual", "Lương được chuyển khoản vào ngày 5 hằng tháng")]],
+        "Ngày 5 hằng tháng, hoặc ngày làm việc liền trước nếu ngày 5 là ngày nghỉ.",
+    ),
+    ("vi", [VI, NONE], STAFF, "Nhân viên được nghỉ bao nhiêu ngày khi kết hôn?", [], None),
+    # English
+    (
+        "en",
+        [EN],
+        STAFF,
+        "What is the minimum password length?",
+        [[("sec-password-standard", "at least 14 characters long")]],
+        "At least 14 characters.",
+    ),
+    (
+        "en",
+        [EN],
+        STAFF,
+        "How long is an account locked after too many failed sign-in attempts?",
+        [[("sec-password-standard", "locked for 15 minutes")]],
+        "15 minutes, after 10 failed attempts.",
+    ),
+    ("en", [EN, NONE], STAFF, "Is there a company dress code?", [], None),
+    (
+        "en",
+        [EN],
+        STAFF,
+        "How often are company laptops replaced?",
+        [[("it-laptop-policy", "Laptops are refreshed every 3 years")]],
+        "Every 3 years.",
+    ),
+    (
+        "en",
+        [EN],
+        STAFF,
+        "How quickly must a lost laptop be reported?",
+        [[("it-laptop-policy", "within 24 hours so that it can be locked")]],
+        "Within 24 hours, to the IT service desk.",
+    ),
+    (
+        "en",
+        [EN],
+        STAFF,
+        "What are the data classification levels?",
+        [[("sec-data-classification", "Public, Internal, Confidential and Restricted")]],
+        "Public, Internal, Confidential and Restricted.",
+    ),
+    (
+        "en",
+        [EN],
+        STAFF,
+        "Can restricted data be copied to a USB drive?",
+        [[("sec-data-classification", "It must never be copied to USB drives")]],
+        "No, never.",
+    ),
+    (
+        "en",
+        [EN],
+        STAFF,
+        "How long does standard delivery between Hanoi and Ho Chi Minh City take?",
+        [[("ops-shipping-sla", "Ho Chi Minh City is completed within 48 hours")]],
+        "Within 48 hours.",
+    ),
+    (
+        "en",
+        [EN],
+        STAFF,
+        "Within how many days must customers claim for damaged goods?",
+        [[("ops-shipping-sla", "within 7 days of delivery")]],
+        "Within 7 days of delivery.",
+    ),
+    (
+        "en",
+        [EN],
+        STAFF,
+        "Which VPN client version is required?",
+        [[("it-vpn-runbook", "version 5.2 or later")]],
+        "Version 5.2 or later.",
+    ),
+    (
+        "en",
+        [EN],
+        STAFF,
+        "What should I do if the VPN client shows error 809?",
+        [[("it-vpn-runbook", "restart the network adapter")]],
+        "Restart the network adapter; if it persists over 15 minutes, open an IT service desk ticket.",
+    ),
+    # Cross-lingual
+    (
+        "en",
+        [X, VERSION],
+        STAFF,
+        "How many days of annual leave does an employee with a full year of service get?",
+        [[("hr-leave-policy", "được nghỉ 14 ngày làm việc mỗi năm")]],
+        "14 working days per year.",
+    ),
+    (
+        "en",
+        [X],
+        STAFF,
+        "Can annual leave be taken by the hour, and what is the minimum?",
+        [[("hr-leave-policy", "tối thiểu 2 giờ cho mỗi lần nghỉ")]],
+        "Yes, at least 2 hours at a time.",
+    ),
+    (
+        "en",
+        [X],
+        STAFF,
+        "When is the annual health check-up?",
+        [[("hr-insurance-benefits", "một lần mỗi năm vào tháng 9")]],
+        "Once a year, in September.",
+    ),
+    (
+        "en",
+        [X],
+        STAFF,
+        "Who is allowed to drive a forklift in the warehouse?",
+        [[("ops-warehouse-safety", "chứng chỉ vận hành xe nâng còn hiệu lực")]],
+        "Only people with a valid forklift operator certificate.",
+    ),
+    ("en", [X, NONE], STAFF, "What is the meal allowance for business trips abroad?", [], None),
+    (
+        "vi",
+        [X],
+        STAFF,
+        "Mật khẩu phải dài tối thiểu bao nhiêu ký tự?",
+        [[("sec-password-standard", "at least 14 characters long")]],
+        "Tối thiểu 14 ký tự.",
+    ),
+    (
+        "vi",
+        [X],
+        STAFF,
+        "Giao hàng hỏa tốc giữa Hà Nội và TP.HCM mất bao lâu?",
+        [
+            [
+                (
+                    "ops-shipping-sla",
+                    "Express delivery between Hanoi and Ho Chi Minh City is completed within 24 hours",
+                )
+            ]
+        ],
+        "Trong vòng 24 giờ.",
+    ),
+    (
+        "vi",
+        [X],
+        STAFF,
+        "Hàng cần bảo quản lạnh được giữ ở nhiệt độ bao nhiêu?",
+        [[("ops-shipping-sla", "between 2 and 8 degrees Celsius")]],
+        "Từ 2 đến 8 độ C.",
+    ),
+    (
+        "vi",
+        [X],
+        STAFF,
+        "Kỹ sư trực on-call phải phản hồi cảnh báo trong bao lâu?",
+        [[("hr-handbook", "respond to pages within 15 minutes")]],
+        "Trong vòng 15 phút.",
+    ),
+    # Multi-document
+    (
+        "en",
+        [X, MULTI],
+        STAFF,
+        "Before using the VPN for the first time, what must a new employee set up, and which client version is needed?",
+        [
+            [("hr-onboarding", "đăng ký xác thực đa yếu tố trước khi truy cập VPN")],
+            [("it-vpn-runbook", "version 5.2 or later")],
+        ],
+        "Enrol in multi-factor authentication, and use VPN client 5.2 or later.",
+    ),
+    (
+        "en",
+        [X, MULTI],
+        STAFF,
+        "What equipment is required when working remotely, and where must work passwords be stored?",
+        [
+            [("hr-remote-work", "sử dụng laptop do công ty cấp và kết nối VPN")],
+            [("sec-password-standard", "only in the company-approved password manager")],
+        ],
+        "A company laptop connected through the VPN; passwords only in the approved password manager.",
+    ),
+    (
+        "vi",
+        [X, MULTI],
+        STAFF,
+        "Nếu làm mất laptop thì phải báo trong bao lâu, và dữ liệu thuộc loại Restricted phải được bảo vệ thế nào?",
+        [
+            [("it-laptop-policy", "within 24 hours so that it can be locked")],
+            [("sec-data-classification", "Restricted data must be encrypted at rest")],
+        ],
+        "Báo cho IT service desk trong 24 giờ; dữ liệu Restricted phải được mã hóa khi lưu trữ.",
+    ),
+    (
+        "en",
+        [EN, MULTI],
+        ENGINEER,
+        "How fast must on-call engineers respond to a page, and what happens if a page is not acknowledged?",
+        [
+            [
+                ("hr-handbook", "respond to pages within 15 minutes"),
+                ("eng-oncall-runbook", "acknowledge a page within 15 minutes"),
+            ],
+            [("eng-oncall-runbook", "escalates to the secondary on-call engineer")],
+        ],
+        "Within 15 minutes; unacknowledged pages go to the secondary on-call, then the engineering manager after 30 minutes.",
+    ),
+    (
+        "en",
+        [X, MULTI],
+        STAFF,
+        "How many days a week can I work remotely, and how much is the internet allowance?",
+        [
+            [
+                ("hr-remote-work", "tối đa 2 ngày mỗi tuần"),
+                ("hr-faq-bilingual", "up to 2 days per week"),
+            ],
+            [("hr-remote-work", "200.000 đồng mỗi tháng")],
+        ],
+        "Up to 2 days a week; 200,000 VND a month when working remotely 4 or more days a month.",
+    ),
+    # Version-sensitive
+    (
+        "en",
+        [EN, VERSION],
+        ENGINEER,
+        "After what time are production deployments frozen on Friday?",
+        [[("eng-deploy-guide", "deployments are frozen after 12:00")]],
+        "After 12:00.",
+    ),
+    (
+        "en",
+        [EN, VERSION],
+        ENGINEER,
+        "At what error rate must a deployment be rolled back?",
+        [[("eng-deploy-guide", "error rate stays above 1% for 5 minutes")]],
+        "If the error rate stays above 1% for 5 minutes; roll back within 10 minutes.",
+    ),
+    (
+        "vi",
+        [VI, VERSION],
+        STAFF,
+        "Ngày phép chưa dùng hết được chuyển sang năm sau tối đa bao nhiêu ngày?",
+        [[("hr-leave-policy", "chuyển sang năm sau tối đa 3 ngày")]],
+        "Tối đa 3 ngày, dùng trước ngày 31 tháng 3.",
+    ),
+    # Access-sensitive: the same question for a reader and a non-reader
+    (
+        "vi",
+        [VI, ACCESS],
+        HR,
+        "Nhân viên xếp loại B được tăng lương bao nhiêu phần trăm?",
+        [[("hr-salary-review", "xếp loại B được tăng 5%")]],
+        "5% lương cơ bản.",
+    ),
+    (
+        "vi",
+        [VI, ACCESS, NONE],
+        STAFF,
+        "Nhân viên xếp loại B được tăng lương bao nhiêu phần trăm?",
+        [],
+        None,
+    ),
+    (
+        "en",
+        [EN, ACCESS],
+        SECURITY,
+        "Within what time must the CISO be notified of a SEV1 incident?",
+        [[("sec-incident-response", "within 1 hour of confirmation")]],
+        "Within 1 hour of confirmation.",
+    ),
+    (
+        "en",
+        [EN, ACCESS, NONE],
+        STAFF,
+        "Within what time must the CISO be notified of a SEV1 incident?",
+        [],
+        None,
+    ),
+    (
+        "vi",
+        [VI, ACCESS],
+        MANAGER,
+        "Tỷ lệ nhân viên xếp loại A trong mỗi phòng ban tối đa là bao nhiêu?",
+        [[("mgr-performance-review", "không vượt quá 15%")]],
+        "Không vượt quá 15%.",
+    ),
+    (
+        "vi",
+        [VI, ACCESS],
+        HR,
+        "Thời hiệu xử lý kỷ luật đối với vi phạm liên quan đến tài chính là bao lâu?",
+        [[("hr-disciplinary", "thời hiệu là 12 tháng")]],
+        "12 tháng.",
+    ),
+    # Tenant isolation: near-identical policies in two tenants
+    (
+        "vi",
+        [VI, TENANT],
+        LOTUS_STAFF,
+        "Nhân viên được nghỉ bao nhiêu ngày phép mỗi năm?",
+        [[("lotus-leave-policy", "được nghỉ 15 ngày phép mỗi năm")]],
+        "15 ngày phép mỗi năm.",
+    ),
+    (
+        "vi",
+        [VI, TENANT, VERSION],
+        STAFF,
+        "Ngày phép chuyển sang năm sau phải sử dụng trước ngày nào?",
+        [[("hr-leave-policy", "phải sử dụng trước ngày 31 tháng 3")]],
+        "Trước ngày 31 tháng 3.",
+    ),
+    ("vi", [VI, NONE], STAFF, "Công ty có hỗ trợ chi phí gửi xe cho nhân viên không?", [], None),
+]
+
+
+def normalize(text: str) -> str:
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFC", text)).strip()
+
+
+def write_manifest() -> None:
+    lines = []
+    for doc_id, version, tenant, title, language, fmt, name, groups in MANIFEST:
+        data = (CORPUS / "docs" / name).read_bytes()
+        lines.append(
+            {
+                "id": doc_id,
+                "version": version,
+                "tenant": tenant,
+                "title": title,
+                "language": language,
+                "format": fmt,
+                "file": f"docs/{name}",
+                "allowed_groups": groups,
+                "source": SOURCE,
+                "license": LICENSE,
+                "sha256": hashlib.sha256(data).hexdigest(),
+            }
+        )
+    (CORPUS / "manifest.jsonl").write_text(
+        "".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines), encoding="utf-8"
+    )
+
+
+def resolve(
+    doc_id: str, quote: str, chunks_cache: dict[str, tuple[int, list[str]]]
+) -> list[dict[str, Any]]:
+    """Every chunk of the served version whose text contains ``quote``."""
+    if doc_id not in chunks_cache:
+        served = [m for m in MANIFEST if m[0] == doc_id][-1]
+        prepared = prepare_document(
+            (CORPUS / "docs" / served[6]).read_bytes(), filename=served[6], chunking=CHUNKING
+        )
+        chunks_cache[doc_id] = (served[1], [normalize(c.text) for c in prepared.chunks])
+    version, texts = chunks_cache[doc_id]
+    hits = [i for i, text in enumerate(texts) if normalize(quote) in text]
+    if not hits:
+        raise SystemExit(f"quote not found in {doc_id} v{version}: {quote!r}")
+    return [
+        {
+            "document_id": doc_id,
+            "version": version,
+            "chunk_index": i,
+            "chunk_id": chunk_id_for(DocumentId(doc_id), version, i),
+        }
+        for i in hits
+    ]
+
+
+def write_questions() -> None:
+    cache: dict[str, tuple[int, list[str]]] = {}
+    rows = []
+    for number, (language, types, principal, question, groups, answer) in enumerate(
+        QUESTIONS, start=1
+    ):
+        evidence = []
+        for group in groups:
+            refs = [ref for doc_id, quote in group for ref in resolve(doc_id, quote, cache)]
+            evidence.append(list({r["chunk_id"]: r for r in refs}.values()))
+        rows.append(
+            {
+                "id": f"q{number:03d}",
+                "question": question,
+                "language": language,
+                "types": types,
+                "principal": principal,
+                "evidence": evidence,
+                "reference_answer": answer,
+            }
+        )
+    BENCHMARK.mkdir(parents=True, exist_ok=True)
+    (BENCHMARK / "questions.jsonl").write_text(
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8"
+    )
+    metadata = {
+        "version": "v1",
+        "corpus_manifest_sha256": hashlib.sha256(
+            (CORPUS / "manifest.jsonl").read_bytes()
+        ).hexdigest(),
+        "chunking": CHUNKING.model_dump(),
+    }
+    (BENCHMARK / "benchmark.json").write_text(
+        json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def main() -> int:
+    write_manifest()
+    write_questions()
+    dataset = load_benchmark(BENCHMARK, load_corpus(CORPUS))  # full validation
+    print(f"{len(dataset.corpus.documents)} document versions, {len(dataset.questions)} questions")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

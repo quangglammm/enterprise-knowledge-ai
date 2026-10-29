@@ -1,0 +1,1509 @@
+{
+  "started_at": "2026-10-29T15:25:37.312209Z",
+  "dataset_version": "v1",
+  "corpus_manifest_sha256": "f24610c4d81a60fce78fb45ab7172a4587eb5d5fc1e3df97bba41a93ed5bdda1",
+  "chunking": {
+    "max_chars": 1200,
+    "overlap_chars": 150
+  },
+  "embedding_model": "Vietnamese_Embedding",
+  "k_values": [
+    1,
+    3,
+    5,
+    10
+  ],
+  "questions": 50,
+  "answerable": 44,
+  "unanswerable": 6,
+  "access_violations": 0,
+  "recall_at_k": {
+    "1": 0.9318,
+    "3": 1.0,
+    "5": 1.0,
+    "10": 1.0
+  },
+  "mrr": 0.9886363636363636,
+  "by_type": {
+    "vietnamese": {
+      "questions": 21,
+      "answerable": 18,
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "mrr": 1.0
+    },
+    "english": {
+      "questions": 16,
+      "answerable": 14,
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "mrr": 1.0
+    },
+    "cross-lingual": {
+      "questions": 13,
+      "answerable": 12,
+      "recall_at_k": {
+        "1": 0.75,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "mrr": 0.9583
+    },
+    "multi-document": {
+      "questions": 5,
+      "answerable": 5,
+      "recall_at_k": {
+        "1": 0.6,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "mrr": 1.0
+    },
+    "version-sensitive": {
+      "questions": 7,
+      "answerable": 7,
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "mrr": 1.0
+    },
+    "access-sensitive": {
+      "questions": 6,
+      "answerable": 4,
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "mrr": 1.0
+    },
+    "tenant-isolation": {
+      "questions": 2,
+      "answerable": 2,
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "mrr": 1.0
+    },
+    "unanswerable": {
+      "questions": 6,
+      "answerable": 0,
+      "recall_at_k": {
+        "1": null,
+        "3": null,
+        "5": null,
+        "10": null
+      },
+      "mrr": null
+    }
+  },
+  "top_score_answerable_mean": 0.5376,
+  "top_score_unanswerable_mean": 0.347,
+  "results": [
+    {
+      "question_id": "q001",
+      "types": [
+        "vietnamese",
+        "version-sensitive"
+      ],
+      "answerable": true,
+      "ranked": [
+        "6dd9e9c2d98c56d7a14fb1608e870a77",
+        "1d228c6c80985b04b64320de9f64b813",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "a9791819d3855287bcbb61993db39959",
+        "0148039b066b568d95f4da7547f59600",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "825bb7173ce25189a88d048ca4c251df",
+        "047c8023de865a1ea2117f21dcefa81a"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.49031,
+      "access_violation": false
+    },
+    {
+      "question_id": "q002",
+      "types": [
+        "vietnamese",
+        "version-sensitive"
+      ],
+      "answerable": true,
+      "ranked": [
+        "4a5fc51cab555397b98722fd256e7ee0",
+        "b01609bd50d85384b81649b934739250",
+        "1d228c6c80985b04b64320de9f64b813",
+        "6dd9e9c2d98c56d7a14fb1608e870a77",
+        "a9791819d3855287bcbb61993db39959",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "0460494be8dc58509e21e92b2986c4b9",
+        "d67ac089586d5107ac9a40bbd6c6a2f1",
+        "16d68950d4c95c96936d7c81721e87be",
+        "0148039b066b568d95f4da7547f59600"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.450936,
+      "access_violation": false
+    },
+    {
+      "question_id": "q003",
+      "types": [
+        "vietnamese"
+      ],
+      "answerable": true,
+      "ranked": [
+        "d67ac089586d5107ac9a40bbd6c6a2f1",
+        "6dd9e9c2d98c56d7a14fb1608e870a77",
+        "4a5fc51cab555397b98722fd256e7ee0",
+        "0460494be8dc58509e21e92b2986c4b9",
+        "56425c273417589580e78b083a910490",
+        "1d228c6c80985b04b64320de9f64b813",
+        "665fa647400558908cb6b3248fe37b9e",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "11fd0f3de6ff53c98a473bf4111d0e04"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.507538,
+      "access_violation": false
+    },
+    {
+      "question_id": "q004",
+      "types": [
+        "vietnamese"
+      ],
+      "answerable": true,
+      "ranked": [
+        "0148039b066b568d95f4da7547f59600",
+        "825bb7173ce25189a88d048ca4c251df",
+        "cd808262b6ae5f098d844eda36a424c5",
+        "16d68950d4c95c96936d7c81721e87be",
+        "1d228c6c80985b04b64320de9f64b813",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "ae32141943705cde89baf199104229fb",
+        "665fa647400558908cb6b3248fe37b9e"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.679583,
+      "access_violation": false
+    },
+    {
+      "question_id": "q005",
+      "types": [
+        "vietnamese"
+      ],
+      "answerable": true,
+      "ranked": [
+        "1d228c6c80985b04b64320de9f64b813",
+        "cd808262b6ae5f098d844eda36a424c5",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "0148039b066b568d95f4da7547f59600",
+        "825bb7173ce25189a88d048ca4c251df",
+        "047c8023de865a1ea2117f21dcefa81a",
+        "b01609bd50d85384b81649b934739250",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "16d68950d4c95c96936d7c81721e87be",
+        "a9791819d3855287bcbb61993db39959"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.647137,
+      "access_violation": false
+    },
+    {
+      "question_id": "q006",
+      "types": [
+        "vietnamese"
+      ],
+      "answerable": true,
+      "ranked": [
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "7d489ad4420a5a52a5ab1f3a6a92103d",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "2b78945b273e58d98ced96f009cb2382",
+        "7a6b96cbf7d15d51bee1ee8e48066148",
+        "eb5505ee9e2f57548f0236ca0cad5624",
+        "cd808262b6ae5f098d844eda36a424c5",
+        "ae32141943705cde89baf199104229fb",
+        "047c8023de865a1ea2117f21dcefa81a",
+        "bf6b2ad511d65da0baad118f47060a5e"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.623423,
+      "access_violation": false
+    },
+    {
+      "question_id": "q007",
+      "types": [
+        "vietnamese"
+      ],
+      "answerable": true,
+      "ranked": [
+        "a9791819d3855287bcbb61993db39959",
+        "b01609bd50d85384b81649b934739250",
+        "1d228c6c80985b04b64320de9f64b813",
+        "3ab7355e416b5df3b75b49bff635b476",
+        "16d68950d4c95c96936d7c81721e87be",
+        "11a8c3d3406c54718ffccbc2348d8cf2",
+        "d67ac089586d5107ac9a40bbd6c6a2f1",
+        "2aafb94d4d4554a8b91826664aeb9513",
+        "ae32141943705cde89baf199104229fb",
+        "bf6b2ad511d65da0baad118f47060a5e"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.472115,
+      "access_violation": false
+    },
+    {
+      "question_id": "q008",
+      "types": [
+        "vietnamese"
+      ],
+      "answerable": true,
+      "ranked": [
+        "994b0df9ac5957248c84e900d349a4b1",
+        "665fa647400558908cb6b3248fe37b9e",
+        "0148039b066b568d95f4da7547f59600",
+        "8558c64bb26c5d0dbb9fe5b307ea8fe7",
+        "7b71e7e2acf65851bfd1d4d4a90e3367",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "825bb7173ce25189a88d048ca4c251df",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "ae32141943705cde89baf199104229fb",
+        "228166430b4a5bc4a9c71438a488bcfa"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.62912,
+      "access_violation": false
+    },
+    {
+      "question_id": "q009",
+      "types": [
+        "vietnamese"
+      ],
+      "answerable": true,
+      "ranked": [
+        "2aafb94d4d4554a8b91826664aeb9513",
+        "50631e7e8ffe51f69101be201845911b",
+        "797e2df331795d93bcc23d0e11110174",
+        "ebe1ae01c8ee56e8a59fa132d2b5948d",
+        "76c4dc4bafdf5d87bcc6195321bd0eec",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "11a8c3d3406c54718ffccbc2348d8cf2",
+        "b01609bd50d85384b81649b934739250",
+        "3ab7355e416b5df3b75b49bff635b476",
+        "ee87eab442fa5beba70b391e17d20916"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.595549,
+      "access_violation": false
+    },
+    {
+      "question_id": "q010",
+      "types": [
+        "vietnamese"
+      ],
+      "answerable": true,
+      "ranked": [
+        "797e2df331795d93bcc23d0e11110174",
+        "2aafb94d4d4554a8b91826664aeb9513",
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "76c4dc4bafdf5d87bcc6195321bd0eec",
+        "300033e31f9c526c89c864ba4779b166",
+        "ee87eab442fa5beba70b391e17d20916",
+        "2b78945b273e58d98ced96f009cb2382",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "4fa447aaa5e4545f8ee82e342f08e3dc"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.621578,
+      "access_violation": false
+    },
+    {
+      "question_id": "q011",
+      "types": [
+        "vietnamese"
+      ],
+      "answerable": true,
+      "ranked": [
+        "eb5505ee9e2f57548f0236ca0cad5624",
+        "047c8023de865a1ea2117f21dcefa81a",
+        "b01609bd50d85384b81649b934739250",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "ee87eab442fa5beba70b391e17d20916",
+        "bf6b2ad511d65da0baad118f47060a5e",
+        "ae32141943705cde89baf199104229fb",
+        "a2311513c8745d9997a8aeab04f9f308",
+        "2b78945b273e58d98ced96f009cb2382",
+        "3ab7355e416b5df3b75b49bff635b476"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.580624,
+      "access_violation": false
+    },
+    {
+      "question_id": "q012",
+      "types": [
+        "vietnamese"
+      ],
+      "answerable": true,
+      "ranked": [
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "1d228c6c80985b04b64320de9f64b813",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "c83f8db686a15722a02aba833b3b5394",
+        "6dd9e9c2d98c56d7a14fb1608e870a77",
+        "d67ac089586d5107ac9a40bbd6c6a2f1",
+        "0148039b066b568d95f4da7547f59600",
+        "a9791819d3855287bcbb61993db39959"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.589088,
+      "access_violation": false
+    },
+    {
+      "question_id": "q013",
+      "types": [
+        "vietnamese",
+        "unanswerable"
+      ],
+      "answerable": false,
+      "ranked": [
+        "0148039b066b568d95f4da7547f59600",
+        "994b0df9ac5957248c84e900d349a4b1",
+        "825bb7173ce25189a88d048ca4c251df",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "665fa647400558908cb6b3248fe37b9e",
+        "7b71e7e2acf65851bfd1d4d4a90e3367",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "ae32141943705cde89baf199104229fb"
+      ],
+      "recall_at_k": null,
+      "reciprocal_rank": null,
+      "top_score": 0.456653,
+      "access_violation": false
+    },
+    {
+      "question_id": "q014",
+      "types": [
+        "english"
+      ],
+      "answerable": true,
+      "ranked": [
+        "ae32141943705cde89baf199104229fb",
+        "2b78945b273e58d98ced96f009cb2382",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "ee87eab442fa5beba70b391e17d20916",
+        "b01609bd50d85384b81649b934739250",
+        "bf6b2ad511d65da0baad118f47060a5e",
+        "4fa447aaa5e4545f8ee82e342f08e3dc",
+        "1c8cc7b0e1445ed9907d229f024c7b7c",
+        "047c8023de865a1ea2117f21dcefa81a",
+        "3ab7355e416b5df3b75b49bff635b476"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.545179,
+      "access_violation": false
+    },
+    {
+      "question_id": "q015",
+      "types": [
+        "english"
+      ],
+      "answerable": true,
+      "ranked": [
+        "2b78945b273e58d98ced96f009cb2382",
+        "ee87eab442fa5beba70b391e17d20916",
+        "50e1160638cb5dd28e03b9da40d91d73",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "ae32141943705cde89baf199104229fb",
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "b01609bd50d85384b81649b934739250",
+        "bf6b2ad511d65da0baad118f47060a5e",
+        "4fa447aaa5e4545f8ee82e342f08e3dc",
+        "48f65cb129d05a8c90924f38c47d36f1"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.582512,
+      "access_violation": false
+    },
+    {
+      "question_id": "q016",
+      "types": [
+        "english",
+        "unanswerable"
+      ],
+      "answerable": false,
+      "ranked": [
+        "3ab7355e416b5df3b75b49bff635b476",
+        "ae32141943705cde89baf199104229fb",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "10564d89e83f56b8a7300a53d8db33d6",
+        "2b78945b273e58d98ced96f009cb2382",
+        "cd808262b6ae5f098d844eda36a424c5",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "7a6b96cbf7d15d51bee1ee8e48066148",
+        "0148039b066b568d95f4da7547f59600",
+        "0627915e20c459d7b117e50168fd9386"
+      ],
+      "recall_at_k": null,
+      "reciprocal_rank": null,
+      "top_score": 0.348706,
+      "access_violation": false
+    },
+    {
+      "question_id": "q017",
+      "types": [
+        "english"
+      ],
+      "answerable": true,
+      "ranked": [
+        "7a6b96cbf7d15d51bee1ee8e48066148",
+        "4fa447aaa5e4545f8ee82e342f08e3dc",
+        "ee87eab442fa5beba70b391e17d20916",
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "a2311513c8745d9997a8aeab04f9f308",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "c83f8db686a15722a02aba833b3b5394",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "10564d89e83f56b8a7300a53d8db33d6",
+        "7d489ad4420a5a52a5ab1f3a6a92103d"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.6005,
+      "access_violation": false
+    },
+    {
+      "question_id": "q018",
+      "types": [
+        "english"
+      ],
+      "answerable": true,
+      "ranked": [
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "7a6b96cbf7d15d51bee1ee8e48066148",
+        "300033e31f9c526c89c864ba4779b166",
+        "4fa447aaa5e4545f8ee82e342f08e3dc",
+        "797e2df331795d93bcc23d0e11110174",
+        "ee87eab442fa5beba70b391e17d20916",
+        "7d489ad4420a5a52a5ab1f3a6a92103d",
+        "2b78945b273e58d98ced96f009cb2382",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "11fd0f3de6ff53c98a473bf4111d0e04"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.616672,
+      "access_violation": false
+    },
+    {
+      "question_id": "q019",
+      "types": [
+        "english"
+      ],
+      "answerable": true,
+      "ranked": [
+        "4cbc10785e7355799196fd3e87db45dc",
+        "3ab7355e416b5df3b75b49bff635b476",
+        "10564d89e83f56b8a7300a53d8db33d6",
+        "50631e7e8ffe51f69101be201845911b",
+        "11a8c3d3406c54718ffccbc2348d8cf2",
+        "2b78945b273e58d98ced96f009cb2382",
+        "ae32141943705cde89baf199104229fb",
+        "bf6b2ad511d65da0baad118f47060a5e",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "48f65cb129d05a8c90924f38c47d36f1"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.567442,
+      "access_violation": false
+    },
+    {
+      "question_id": "q020",
+      "types": [
+        "english"
+      ],
+      "answerable": true,
+      "ranked": [
+        "3ab7355e416b5df3b75b49bff635b476",
+        "10564d89e83f56b8a7300a53d8db33d6",
+        "ae32141943705cde89baf199104229fb",
+        "4fa447aaa5e4545f8ee82e342f08e3dc",
+        "b01609bd50d85384b81649b934739250",
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "ee87eab442fa5beba70b391e17d20916",
+        "2b78945b273e58d98ced96f009cb2382",
+        "4cbc10785e7355799196fd3e87db45dc",
+        "047c8023de865a1ea2117f21dcefa81a"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.573898,
+      "access_violation": false
+    },
+    {
+      "question_id": "q021",
+      "types": [
+        "english"
+      ],
+      "answerable": true,
+      "ranked": [
+        "11a8c3d3406c54718ffccbc2348d8cf2",
+        "ebe1ae01c8ee56e8a59fa132d2b5948d",
+        "1c8cc7b0e1445ed9907d229f024c7b7c",
+        "50631e7e8ffe51f69101be201845911b",
+        "300033e31f9c526c89c864ba4779b166",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "0460494be8dc58509e21e92b2986c4b9",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "b01609bd50d85384b81649b934739250"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.727405,
+      "access_violation": false
+    },
+    {
+      "question_id": "q022",
+      "types": [
+        "english"
+      ],
+      "answerable": true,
+      "ranked": [
+        "300033e31f9c526c89c864ba4779b166",
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "797e2df331795d93bcc23d0e11110174",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "7a6b96cbf7d15d51bee1ee8e48066148",
+        "2b78945b273e58d98ced96f009cb2382",
+        "11a8c3d3406c54718ffccbc2348d8cf2",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "7d489ad4420a5a52a5ab1f3a6a92103d"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.635839,
+      "access_violation": false
+    },
+    {
+      "question_id": "q023",
+      "types": [
+        "english"
+      ],
+      "answerable": true,
+      "ranked": [
+        "1c8cc7b0e1445ed9907d229f024c7b7c",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "48f65cb129d05a8c90924f38c47d36f1",
+        "cd808262b6ae5f098d844eda36a424c5",
+        "a2311513c8745d9997a8aeab04f9f308",
+        "50e1160638cb5dd28e03b9da40d91d73",
+        "2b78945b273e58d98ced96f009cb2382",
+        "4fa447aaa5e4545f8ee82e342f08e3dc",
+        "ae32141943705cde89baf199104229fb",
+        "eb5505ee9e2f57548f0236ca0cad5624"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.500678,
+      "access_violation": false
+    },
+    {
+      "question_id": "q024",
+      "types": [
+        "english"
+      ],
+      "answerable": true,
+      "ranked": [
+        "50e1160638cb5dd28e03b9da40d91d73",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "48f65cb129d05a8c90924f38c47d36f1",
+        "2b78945b273e58d98ced96f009cb2382",
+        "1c8cc7b0e1445ed9907d229f024c7b7c",
+        "a2311513c8745d9997a8aeab04f9f308",
+        "50631e7e8ffe51f69101be201845911b",
+        "cd808262b6ae5f098d844eda36a424c5",
+        "ee87eab442fa5beba70b391e17d20916",
+        "bf6b2ad511d65da0baad118f47060a5e"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.630358,
+      "access_violation": false
+    },
+    {
+      "question_id": "q025",
+      "types": [
+        "cross-lingual",
+        "version-sensitive"
+      ],
+      "answerable": true,
+      "ranked": [
+        "7b71e7e2acf65851bfd1d4d4a90e3367",
+        "0148039b066b568d95f4da7547f59600",
+        "8558c64bb26c5d0dbb9fe5b307ea8fe7",
+        "7a6b96cbf7d15d51bee1ee8e48066148",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "a9791819d3855287bcbb61993db39959",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "665fa647400558908cb6b3248fe37b9e",
+        "994b0df9ac5957248c84e900d349a4b1",
+        "825bb7173ce25189a88d048ca4c251df"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.427119,
+      "access_violation": false
+    },
+    {
+      "question_id": "q026",
+      "types": [
+        "cross-lingual"
+      ],
+      "answerable": true,
+      "ranked": [
+        "8558c64bb26c5d0dbb9fe5b307ea8fe7",
+        "7b71e7e2acf65851bfd1d4d4a90e3367",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "0148039b066b568d95f4da7547f59600",
+        "a9791819d3855287bcbb61993db39959",
+        "6dd9e9c2d98c56d7a14fb1608e870a77",
+        "7a6b96cbf7d15d51bee1ee8e48066148",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "665fa647400558908cb6b3248fe37b9e"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.406258,
+      "access_violation": false
+    },
+    {
+      "question_id": "q027",
+      "types": [
+        "cross-lingual"
+      ],
+      "answerable": true,
+      "ranked": [
+        "c83f8db686a15722a02aba833b3b5394",
+        "a9791819d3855287bcbb61993db39959",
+        "7a6b96cbf7d15d51bee1ee8e48066148",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "ee87eab442fa5beba70b391e17d20916",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "2b78945b273e58d98ced96f009cb2382",
+        "797e2df331795d93bcc23d0e11110174",
+        "eb5505ee9e2f57548f0236ca0cad5624"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.348245,
+      "access_violation": false
+    },
+    {
+      "question_id": "q028",
+      "types": [
+        "cross-lingual"
+      ],
+      "answerable": true,
+      "ranked": [
+        "2aafb94d4d4554a8b91826664aeb9513",
+        "76c4dc4bafdf5d87bcc6195321bd0eec",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "797e2df331795d93bcc23d0e11110174",
+        "50631e7e8ffe51f69101be201845911b",
+        "16d68950d4c95c96936d7c81721e87be",
+        "0148039b066b568d95f4da7547f59600",
+        "0627915e20c459d7b117e50168fd9386",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "ae32141943705cde89baf199104229fb"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.416617,
+      "access_violation": false
+    },
+    {
+      "question_id": "q029",
+      "types": [
+        "cross-lingual",
+        "unanswerable"
+      ],
+      "answerable": false,
+      "ranked": [
+        "6dd9e9c2d98c56d7a14fb1608e870a77",
+        "d67ac089586d5107ac9a40bbd6c6a2f1",
+        "0460494be8dc58509e21e92b2986c4b9",
+        "a9791819d3855287bcbb61993db39959",
+        "4a5fc51cab555397b98722fd256e7ee0",
+        "b01609bd50d85384b81649b934739250",
+        "eb5505ee9e2f57548f0236ca0cad5624",
+        "1d228c6c80985b04b64320de9f64b813",
+        "3ab7355e416b5df3b75b49bff635b476",
+        "228166430b4a5bc4a9c71438a488bcfa"
+      ],
+      "recall_at_k": null,
+      "reciprocal_rank": null,
+      "top_score": 0.325882,
+      "access_violation": false
+    },
+    {
+      "question_id": "q030",
+      "types": [
+        "cross-lingual"
+      ],
+      "answerable": true,
+      "ranked": [
+        "ae32141943705cde89baf199104229fb",
+        "2b78945b273e58d98ced96f009cb2382",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "ee87eab442fa5beba70b391e17d20916",
+        "4fa447aaa5e4545f8ee82e342f08e3dc",
+        "3ab7355e416b5df3b75b49bff635b476",
+        "b01609bd50d85384b81649b934739250",
+        "eb5505ee9e2f57548f0236ca0cad5624",
+        "bf6b2ad511d65da0baad118f47060a5e",
+        "1c8cc7b0e1445ed9907d229f024c7b7c"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.539681,
+      "access_violation": false
+    },
+    {
+      "question_id": "q031",
+      "types": [
+        "cross-lingual"
+      ],
+      "answerable": true,
+      "ranked": [
+        "11a8c3d3406c54718ffccbc2348d8cf2",
+        "ebe1ae01c8ee56e8a59fa132d2b5948d",
+        "50631e7e8ffe51f69101be201845911b",
+        "300033e31f9c526c89c864ba4779b166",
+        "b01609bd50d85384b81649b934739250",
+        "797e2df331795d93bcc23d0e11110174",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "2aafb94d4d4554a8b91826664aeb9513",
+        "2b78945b273e58d98ced96f009cb2382",
+        "16d68950d4c95c96936d7c81721e87be"
+      ],
+      "recall_at_k": {
+        "1": 0.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 0.5,
+      "top_score": 0.410331,
+      "access_violation": false
+    },
+    {
+      "question_id": "q032",
+      "types": [
+        "cross-lingual"
+      ],
+      "answerable": true,
+      "ranked": [
+        "50631e7e8ffe51f69101be201845911b",
+        "ae32141943705cde89baf199104229fb",
+        "76c4dc4bafdf5d87bcc6195321bd0eec",
+        "300033e31f9c526c89c864ba4779b166",
+        "2aafb94d4d4554a8b91826664aeb9513",
+        "3ab7355e416b5df3b75b49bff635b476",
+        "11a8c3d3406c54718ffccbc2348d8cf2",
+        "4fa447aaa5e4545f8ee82e342f08e3dc",
+        "ebe1ae01c8ee56e8a59fa132d2b5948d",
+        "cd808262b6ae5f098d844eda36a424c5"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.509265,
+      "access_violation": false
+    },
+    {
+      "question_id": "q033",
+      "types": [
+        "cross-lingual"
+      ],
+      "answerable": true,
+      "ranked": [
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "797e2df331795d93bcc23d0e11110174",
+        "2b78945b273e58d98ced96f009cb2382",
+        "ee87eab442fa5beba70b391e17d20916",
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "50e1160638cb5dd28e03b9da40d91d73",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "300033e31f9c526c89c864ba4779b166",
+        "825bb7173ce25189a88d048ca4c251df",
+        "b01609bd50d85384b81649b934739250"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.448298,
+      "access_violation": false
+    },
+    {
+      "question_id": "q034",
+      "types": [
+        "cross-lingual",
+        "multi-document"
+      ],
+      "answerable": true,
+      "ranked": [
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "1c8cc7b0e1445ed9907d229f024c7b7c",
+        "48f65cb129d05a8c90924f38c47d36f1",
+        "cd808262b6ae5f098d844eda36a424c5",
+        "a2311513c8745d9997a8aeab04f9f308",
+        "50e1160638cb5dd28e03b9da40d91d73",
+        "2b78945b273e58d98ced96f009cb2382",
+        "ae32141943705cde89baf199104229fb",
+        "eb5505ee9e2f57548f0236ca0cad5624",
+        "bf6b2ad511d65da0baad118f47060a5e"
+      ],
+      "recall_at_k": {
+        "1": 0.5,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.496946,
+      "access_violation": false
+    },
+    {
+      "question_id": "q035",
+      "types": [
+        "cross-lingual",
+        "multi-document"
+      ],
+      "answerable": true,
+      "ranked": [
+        "cd808262b6ae5f098d844eda36a424c5",
+        "ae32141943705cde89baf199104229fb",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "ee87eab442fa5beba70b391e17d20916",
+        "2b78945b273e58d98ced96f009cb2382",
+        "1c8cc7b0e1445ed9907d229f024c7b7c",
+        "4fa447aaa5e4545f8ee82e342f08e3dc",
+        "3ab7355e416b5df3b75b49bff635b476",
+        "047c8023de865a1ea2117f21dcefa81a"
+      ],
+      "recall_at_k": {
+        "1": 0.5,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.42644,
+      "access_violation": false
+    },
+    {
+      "question_id": "q036",
+      "types": [
+        "cross-lingual",
+        "multi-document"
+      ],
+      "answerable": true,
+      "ranked": [
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "3ab7355e416b5df3b75b49bff635b476",
+        "7a6b96cbf7d15d51bee1ee8e48066148",
+        "2b78945b273e58d98ced96f009cb2382",
+        "4fa447aaa5e4545f8ee82e342f08e3dc",
+        "10564d89e83f56b8a7300a53d8db33d6",
+        "300033e31f9c526c89c864ba4779b166",
+        "ee87eab442fa5beba70b391e17d20916",
+        "7d489ad4420a5a52a5ab1f3a6a92103d",
+        "4cbc10785e7355799196fd3e87db45dc"
+      ],
+      "recall_at_k": {
+        "1": 0.5,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.479717,
+      "access_violation": false
+    },
+    {
+      "question_id": "q037",
+      "types": [
+        "english",
+        "multi-document"
+      ],
+      "answerable": true,
+      "ranked": [
+        "3bece6a521c851348c67927720276895",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "2054525c3e8c5483a74255414cf118cf",
+        "a21b8eeeca7f59da9285c59e970e81dc",
+        "ee87eab442fa5beba70b391e17d20916",
+        "13a5ba8f85c6552b90e35294db112041",
+        "2b78945b273e58d98ced96f009cb2382",
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "c23b3ef67b9e567d815b590d47701469"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.654627,
+      "access_violation": false
+    },
+    {
+      "question_id": "q038",
+      "types": [
+        "cross-lingual",
+        "multi-document"
+      ],
+      "answerable": true,
+      "ranked": [
+        "0148039b066b568d95f4da7547f59600",
+        "1d228c6c80985b04b64320de9f64b813",
+        "825bb7173ce25189a88d048ca4c251df",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "b01609bd50d85384b81649b934739250",
+        "cd808262b6ae5f098d844eda36a424c5",
+        "d67ac089586d5107ac9a40bbd6c6a2f1",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "6dd9e9c2d98c56d7a14fb1608e870a77"
+      ],
+      "recall_at_k": {
+        "1": 0.5,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.457034,
+      "access_violation": false
+    },
+    {
+      "question_id": "q039",
+      "types": [
+        "english",
+        "version-sensitive"
+      ],
+      "answerable": true,
+      "ranked": [
+        "3138758202b6574c9c5ab30654e6a0e3",
+        "13a5ba8f85c6552b90e35294db112041",
+        "c23b3ef67b9e567d815b590d47701469",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "a21b8eeeca7f59da9285c59e970e81dc",
+        "3bece6a521c851348c67927720276895",
+        "2054525c3e8c5483a74255414cf118cf",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "797e2df331795d93bcc23d0e11110174",
+        "50631e7e8ffe51f69101be201845911b"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.617216,
+      "access_violation": false
+    },
+    {
+      "question_id": "q040",
+      "types": [
+        "english",
+        "version-sensitive"
+      ],
+      "answerable": true,
+      "ranked": [
+        "13a5ba8f85c6552b90e35294db112041",
+        "3138758202b6574c9c5ab30654e6a0e3",
+        "c23b3ef67b9e567d815b590d47701469",
+        "ee87eab442fa5beba70b391e17d20916",
+        "3bece6a521c851348c67927720276895",
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "2b78945b273e58d98ced96f009cb2382",
+        "a21b8eeeca7f59da9285c59e970e81dc",
+        "3ab7355e416b5df3b75b49bff635b476",
+        "2054525c3e8c5483a74255414cf118cf"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.616065,
+      "access_violation": false
+    },
+    {
+      "question_id": "q041",
+      "types": [
+        "vietnamese",
+        "version-sensitive"
+      ],
+      "answerable": true,
+      "ranked": [
+        "7b71e7e2acf65851bfd1d4d4a90e3367",
+        "8558c64bb26c5d0dbb9fe5b307ea8fe7",
+        "665fa647400558908cb6b3248fe37b9e",
+        "2210d6400bab5892b555979063ad79f1",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "ee87eab442fa5beba70b391e17d20916",
+        "b01609bd50d85384b81649b934739250",
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "2b78945b273e58d98ced96f009cb2382"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.449574,
+      "access_violation": false
+    },
+    {
+      "question_id": "q042",
+      "types": [
+        "vietnamese",
+        "access-sensitive"
+      ],
+      "answerable": true,
+      "ranked": [
+        "d5baecee16a85de8bf4b18063b68f284",
+        "e9a6da863bfb5b4abce391337eed70da",
+        "5200ecd1d218586a8c9b4058f7d0ad44",
+        "a473e096357d5579b59b93cd47c44a2d",
+        "a9791819d3855287bcbb61993db39959",
+        "1d228c6c80985b04b64320de9f64b813",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "d67ac089586d5107ac9a40bbd6c6a2f1",
+        "0148039b066b568d95f4da7547f59600"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.519921,
+      "access_violation": false
+    },
+    {
+      "question_id": "q043",
+      "types": [
+        "vietnamese",
+        "access-sensitive",
+        "unanswerable"
+      ],
+      "answerable": false,
+      "ranked": [
+        "a9791819d3855287bcbb61993db39959",
+        "1d228c6c80985b04b64320de9f64b813",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "d67ac089586d5107ac9a40bbd6c6a2f1",
+        "0148039b066b568d95f4da7547f59600",
+        "825bb7173ce25189a88d048ca4c251df",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "7a6b96cbf7d15d51bee1ee8e48066148",
+        "3ab7355e416b5df3b75b49bff635b476"
+      ],
+      "recall_at_k": null,
+      "reciprocal_rank": null,
+      "top_score": 0.282112,
+      "access_violation": false
+    },
+    {
+      "question_id": "q044",
+      "types": [
+        "english",
+        "access-sensitive"
+      ],
+      "answerable": true,
+      "ranked": [
+        "a87b4ec8f42b5cba9ea11e62fcd6f6cd",
+        "0e7054bb4178591c9f26c68e61dee024",
+        "869bd3cdd2ed545587d5992caf370f4b",
+        "797e2df331795d93bcc23d0e11110174",
+        "7baec43140945343ad56d842bf4d5e8f",
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "ee87eab442fa5beba70b391e17d20916",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "2b78945b273e58d98ced96f009cb2382"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.602048,
+      "access_violation": false
+    },
+    {
+      "question_id": "q045",
+      "types": [
+        "english",
+        "access-sensitive",
+        "unanswerable"
+      ],
+      "answerable": false,
+      "ranked": [
+        "797e2df331795d93bcc23d0e11110174",
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "ee87eab442fa5beba70b391e17d20916",
+        "49df5dc0274f5919941e1509ab37d3ec",
+        "2b78945b273e58d98ced96f009cb2382",
+        "7a6b96cbf7d15d51bee1ee8e48066148",
+        "300033e31f9c526c89c864ba4779b166",
+        "11fd0f3de6ff53c98a473bf4111d0e04",
+        "228166430b4a5bc4a9c71438a488bcfa"
+      ],
+      "recall_at_k": null,
+      "reciprocal_rank": null,
+      "top_score": 0.283374,
+      "access_violation": false
+    },
+    {
+      "question_id": "q046",
+      "types": [
+        "vietnamese",
+        "access-sensitive"
+      ],
+      "answerable": true,
+      "ranked": [
+        "c5256d01f92a5ad1aea0d8166fa7c159",
+        "d5baecee16a85de8bf4b18063b68f284",
+        "c993f7c98ed8546a80b32f7bae00e76c",
+        "0148039b066b568d95f4da7547f59600",
+        "047c8023de865a1ea2117f21dcefa81a",
+        "b01609bd50d85384b81649b934739250",
+        "e9a6da863bfb5b4abce391337eed70da",
+        "825bb7173ce25189a88d048ca4c251df",
+        "7c812eb7bb165efc8dfdc80b4a34c785",
+        "4cbc10785e7355799196fd3e87db45dc"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.612057,
+      "access_violation": false
+    },
+    {
+      "question_id": "q047",
+      "types": [
+        "vietnamese",
+        "access-sensitive"
+      ],
+      "answerable": true,
+      "ranked": [
+        "9c86744ba9655797a4449ff285b500c1",
+        "a16e031371f1547d8cd441d2e8cf4cf0",
+        "cb1045d294e85f39b7efdba02b3fd8ed",
+        "c86f672e7faf59ffb648b8cd7f9e9a1d",
+        "2b78945b273e58d98ced96f009cb2382",
+        "e9a6da863bfb5b4abce391337eed70da",
+        "a473e096357d5579b59b93cd47c44a2d",
+        "7a6b96cbf7d15d51bee1ee8e48066148",
+        "16d68950d4c95c96936d7c81721e87be",
+        "7b71e7e2acf65851bfd1d4d4a90e3367"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.564126,
+      "access_violation": false
+    },
+    {
+      "question_id": "q048",
+      "types": [
+        "vietnamese",
+        "tenant-isolation"
+      ],
+      "answerable": true,
+      "ranked": [
+        "2172f9ceafc75c5ba7260692d1432684",
+        "7a3cf5cb1283580d85ef0a492957c5aa"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.439131,
+      "access_violation": false
+    },
+    {
+      "question_id": "q049",
+      "types": [
+        "vietnamese",
+        "tenant-isolation",
+        "version-sensitive"
+      ],
+      "answerable": true,
+      "ranked": [
+        "7b71e7e2acf65851bfd1d4d4a90e3367",
+        "665fa647400558908cb6b3248fe37b9e",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "2210d6400bab5892b555979063ad79f1",
+        "8558c64bb26c5d0dbb9fe5b307ea8fe7",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "ee87eab442fa5beba70b391e17d20916",
+        "047c8023de865a1ea2117f21dcefa81a",
+        "2e2ce17ea9ca57a5a7ca9062eb75f12c",
+        "11fd0f3de6ff53c98a473bf4111d0e04"
+      ],
+      "recall_at_k": {
+        "1": 1.0,
+        "3": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "reciprocal_rank": 1.0,
+      "top_score": 0.346745,
+      "access_violation": false
+    },
+    {
+      "question_id": "q050",
+      "types": [
+        "vietnamese",
+        "unanswerable"
+      ],
+      "answerable": false,
+      "ranked": [
+        "1d228c6c80985b04b64320de9f64b813",
+        "228166430b4a5bc4a9c71438a488bcfa",
+        "16d68950d4c95c96936d7c81721e87be",
+        "7a6b96cbf7d15d51bee1ee8e48066148",
+        "0460494be8dc58509e21e92b2986c4b9",
+        "a9791819d3855287bcbb61993db39959",
+        "3e797b64d0a95c0ba53ba04c2a0cef20",
+        "d67ac089586d5107ac9a40bbd6c6a2f1",
+        "0148039b066b568d95f4da7547f59600",
+        "11fd0f3de6ff53c98a473bf4111d0e04"
+      ],
+      "recall_at_k": null,
+      "reciprocal_rank": null,
+      "top_score": 0.385315,
+      "access_violation": false
+    }
+  ]
+}

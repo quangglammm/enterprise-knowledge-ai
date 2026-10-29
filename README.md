@@ -41,6 +41,7 @@ curl -i http://localhost:8000/health/ready
 | Unit tests | `uv run pytest` |
 | Integration tests | `docker compose up -d postgres` then `EKA_TEST_DATABASE_URL=postgresql://eka:eka@localhost:5432/eka_test uv run pytest -m integration` |
 | Apply migrations | `uv run eka-migrate` |
+| Retrieval benchmark | `uv run python scripts/run_benchmark.py --database-url postgresql://eka:eka@localhost:5432/eka_test` (wipes that database; add `--embedding fpt` for real retrieval, paid) |
 | Add a dependency | `uv add <pkg>` (dev: `uv add --dev <pkg>`) |
 
 CI runs the same checks on every pull request (`.github/workflows/ci.yml`).
@@ -115,7 +116,7 @@ src/enterprise_knowledge/
   ingestion/      format detection, parsing, normalization, chunking, IngestDocument and DeleteDocument use cases
   retrieval/      SearchKnowledge use case
   generation/     AnswerQuestion and GenerateAnswer use cases, versioned prompt, answer parsing and citation checks
-  evaluation/     model trial scoring (more benchmark runners come with EVAL-01)
+  evaluation/     retrieval benchmark, Recall@k and MRR, model trial scoring
   infrastructure/ adapters: Postgres store and vector search, migrations, blob store, FPT chat and embeddings, dev embedder
   api/            HTTP layer only (routes, middleware, app factory)
   observability/  structured logging, later tracing and metrics
@@ -128,8 +129,10 @@ tests/
   architecture/   import-linter contracts run as a test
 datasets/
   fixtures/       small synthetic bilingual documents for parser tests
+  corpus/v1/      bilingual Bamboo Harbor corpus (21 documents, 2 tenants) and its manifest
+  benchmark/v1/   50 labelled retrieval questions (ADR-0011)
   model_trial/    versioned grounded-answer cases for the ADR-0004 model trial
-scripts/          fixture generator, FPT smoke test, model trial runner
+scripts/          fixtures, benchmark builder and runner, chunk viewer, FPT smoke test, model trial
 docs/
   adr/            architecture decision records
   evaluation/     recorded trial and benchmark results (no answer text)
@@ -165,6 +168,7 @@ More packages (`agents`, `worker`) are added when their first feature lands, rat
 - [ADR-0008: Document lifecycle: superseded versions and deletion](docs/adr/0008-document-lifecycle.md)
 - [ADR-0009: Grounded answer generation and citation validation](docs/adr/0009-grounded-answer-generation.md)
 - [ADR-0010: FPT model adapters: transport, retries and errors](docs/adr/0010-fpt-model-adapters.md)
+- [ADR-0011: Benchmark v1: corpus, chunk-ID labels and retrieval metrics](docs/adr/0011-benchmark-v1.md)
 
 ## Data
 
