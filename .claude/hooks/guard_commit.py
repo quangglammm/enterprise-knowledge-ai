@@ -5,6 +5,8 @@ Claude/Anthropic attribution trailers. Exit code 2 blocks the Bash call and show
 reason to Claude. Standard library only.
 """
 
+from __future__ import annotations  # the hook runs under whatever python3 is on PATH
+
 import json
 import re
 import shlex
