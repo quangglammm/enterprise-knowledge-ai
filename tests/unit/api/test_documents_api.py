@@ -11,6 +11,9 @@ from pydantic import SecretStr, ValidationError
 from enterprise_knowledge.api.app import create_app
 from enterprise_knowledge.api.services import Services
 from enterprise_knowledge.config import Environment, Settings
+from enterprise_knowledge.domain.documents import Document
+from enterprise_knowledge.domain.errors import DocumentAlreadyExistsError
+from enterprise_knowledge.ingestion.delete import DeleteDocument
 from enterprise_knowledge.ingestion.ingest import IngestDocument
 from enterprise_knowledge.ingestion.limits import IngestionLimits
 from enterprise_knowledge.retrieval.search import SearchKnowledge
@@ -36,21 +39,26 @@ def make_settings(**overrides: object) -> Settings:
     return Settings.model_validate(values)
 
 
-@pytest.fixture
-def client() -> Iterator[TestClient]:
-    store = InMemoryDocumentStore()
+def make_services(store: InMemoryDocumentStore) -> Services:
     embedder = HashEmbedder()
-    services = Services(
+    blobs = InMemoryBlobStore()
+    return Services(
         documents=store,
         ingest=IngestDocument(
             documents=store,
             embedder=embedder,
-            blobs=InMemoryBlobStore(),
+            blobs=blobs,
             limits=IngestionLimits(max_bytes=MAX_UPLOAD),
         ),
+        delete=DeleteDocument(documents=store, blobs=blobs),
         search=SearchKnowledge(search=store, embedder=embedder),
         max_upload_bytes=MAX_UPLOAD,
     )
+
+
+@pytest.fixture
+def client() -> Iterator[TestClient]:
+    services = make_services(InMemoryDocumentStore())
     with TestClient(create_app(make_settings(), services=services)) as test_client:
         yield test_client
 
@@ -132,6 +140,55 @@ def test_new_version_of_existing_document(client: TestClient) -> None:
     assert result.body["document"]["version"] == 2
 
 
+def test_delete_returns_204_and_removes_the_document(client: TestClient) -> None:
+    doc_id = upload(client, STAFF).body["document"]["id"]
+
+    response = client.delete(f"/v1/documents/{doc_id}", headers=STAFF)
+
+    assert response.status_code == 204
+    assert client.get(f"/v1/documents/{doc_id}", headers=STAFF).status_code == 404
+    assert client.get(f"/v1/documents/{doc_id}/chunks", headers=STAFF).status_code == 404
+    search = client.post("/v1/search", headers=STAFF, json={"query": "nghỉ phép năm"})
+    assert search.json()["results"] == []
+
+
+def test_deleting_twice_is_204(client: TestClient) -> None:
+    doc_id = upload(client, STAFF).body["document"]["id"]
+    client.delete(f"/v1/documents/{doc_id}", headers=STAFF)
+
+    response = client.delete(f"/v1/documents/{doc_id}", headers=STAFF)
+
+    assert response.status_code == 204
+
+
+def test_deleted_document_cannot_get_a_new_version(client: TestClient) -> None:
+    doc_id = upload(client, STAFF).body["document"]["id"]
+    client.delete(f"/v1/documents/{doc_id}", headers=STAFF)
+
+    result = upload(client, STAFF, filename="x.md", data=b"# T\n\ntext", document_id=doc_id)
+
+    assert_error(result, 404, "document_not_found")
+
+
+class _LosesVersionRace(InMemoryDocumentStore):
+    """Another request created the same version between our read and our insert."""
+
+    async def add_document(self, document: Document) -> None:
+        if document.version > 1:
+            raise DocumentAlreadyExistsError(f"{document.id} v{document.version} exists")
+        await super().add_document(document)
+
+
+def test_concurrent_new_version_upload_is_409() -> None:
+    services = make_services(_LosesVersionRace())
+    with TestClient(create_app(make_settings(), services=services)) as racing:
+        doc_id = upload(racing, STAFF).body["document"]["id"]
+
+        result = upload(racing, STAFF, filename="x.md", data=b"# T\n\ntext", document_id=doc_id)
+
+    assert_error(result, 409, "document_exists")
+
+
 # --- access control ------------------------------------------------------------------
 
 
@@ -156,6 +213,16 @@ def test_cannot_version_a_document_you_cannot_read(client: TestClient) -> None:
     result = upload(client, STAFF, filename="x.md", data=b"# T\n\ntext", document_id=doc_id)
 
     assert_error(result, 404, "document_not_found")
+
+
+def test_cannot_delete_a_document_you_cannot_read(client: TestClient) -> None:
+    doc_id = upload(client, HR, groups="hr").body["document"]["id"]
+
+    response = client.delete(f"/v1/documents/{doc_id}", headers=STAFF)
+
+    assert response.status_code == 404
+    assert response.json()["error"]["category"] == "document_not_found"
+    assert client.get(f"/v1/documents/{doc_id}", headers=HR).status_code == 200
 
 
 @pytest.mark.parametrize(

@@ -18,7 +18,12 @@ Vector = tuple[float, ...]
 
 
 class DocumentRepository(Protocol):
-    """Document metadata and chunks. Each method is atomic."""
+    """Document metadata and chunks. Each method is atomic.
+
+    Every write applies the serving rule (ADR-0007, ADR-0008): search serves a document's
+    highest indexed version, and chunks of older versions are deleted in the same write.
+    Document rows of all versions are kept as history.
+    """
 
     async def add_document(self, document: Document) -> None:
         """Insert a new document version. Raises if (id, version) already exists."""
@@ -53,7 +58,10 @@ class DocumentRepository(Protocol):
         ...
 
     async def delete_document(self, tenant_id: TenantId, document_id: DocumentId) -> None:
-        """Remove all versions and their chunks from search. Idempotent."""
+        """Mark every version deleted and remove all their chunks. Idempotent.
+
+        ``get_document`` still returns the deleted version, so callers can tell deleted
+        from absent; nothing else about a deleted document is served."""
         ...
 
 

@@ -22,6 +22,7 @@ from enterprise_knowledge.config import Settings, get_settings
 from enterprise_knowledge.infrastructure.blobs import LocalBlobStore
 from enterprise_knowledge.infrastructure.embeddings.hashing import HashingEmbedder
 from enterprise_knowledge.infrastructure.postgres.store import PostgresDocumentStore
+from enterprise_knowledge.ingestion.delete import DeleteDocument
 from enterprise_knowledge.ingestion.ingest import IngestDocument
 from enterprise_knowledge.ingestion.limits import IngestionLimits
 from enterprise_knowledge.observability.logging import configure_logging
@@ -77,14 +78,16 @@ def create_production_app(settings: Settings | None = None) -> FastAPI:
 def build_services(settings: Settings, store: PostgresDocumentStore) -> Services:
     """Wire use cases to adapters. The hashing embedder is dev-only (settings enforce it)."""
     embedder = HashingEmbedder(dimension=settings.embedding_dimension)
+    blobs = LocalBlobStore(settings.blob_dir)
     return Services(
         documents=store,
         ingest=IngestDocument(
             documents=store,
             embedder=embedder,
-            blobs=LocalBlobStore(settings.blob_dir),
+            blobs=blobs,
             limits=IngestionLimits(max_bytes=settings.max_upload_bytes),
         ),
+        delete=DeleteDocument(documents=store, blobs=blobs),
         search=SearchKnowledge(search=store, embedder=embedder),
         max_upload_bytes=settings.max_upload_bytes,
     )

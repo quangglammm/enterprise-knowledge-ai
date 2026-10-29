@@ -20,7 +20,7 @@ from enterprise_knowledge.domain.documents import (
     Embedding,
 )
 from enterprise_knowledge.domain.errors import DocumentNotFoundError
-from enterprise_knowledge.domain.ids import DocumentId, new_document_id
+from enterprise_knowledge.domain.ids import DocumentId, TenantId, new_document_id
 from enterprise_knowledge.domain.ports import BlobStore, DocumentRepository, Embedder
 from enterprise_knowledge.ingestion.chunking import ChunkingSettings, build_chunks
 from enterprise_knowledge.ingestion.limits import IngestionLimits
@@ -48,8 +48,9 @@ def embedding_input(title: str, section: str | None, text: str) -> str:
     return f"{header}\n\n{text}"
 
 
-def blob_key(document: Document) -> str:
-    return f"{document.tenant_id}/{document.id}/v{document.version}"
+def blob_key(tenant_id: TenantId, document_id: DocumentId, version: int) -> str:
+    """Where a version's original upload is stored. Versions are numbered 1..N."""
+    return f"{tenant_id}/{document_id}/v{version}"
 
 
 class IngestDocument:
@@ -106,7 +107,11 @@ class IngestDocument:
         document = await self._create_version(prepared, access, filename, document_id, title)
         try:
             chunks = build_chunks(document, prepared.chunks)
-            await self._blobs.put(blob_key(document), data, content_type=document.content_type)
+            await self._blobs.put(
+                blob_key(document.tenant_id, document.id, document.version),
+                data,
+                content_type=document.content_type,
+            )
             embeddings = await self._embed(document, chunks)
             await self._documents.replace_chunks(document, chunks, embeddings)
             indexed = document.with_status(DocumentStatus.INDEXED, now=self._clock())
@@ -152,7 +157,8 @@ class IngestDocument:
             document_id = self._new_id()
         else:
             current = await self._documents.get_document(access.tenant_id, document_id)
-            if current is None:
+            # A deleted document stays deleted (ADR-0008); re-upload creates a new one.
+            if current is None or current.status is DocumentStatus.DELETED:
                 raise DocumentNotFoundError(f"document {document_id} not found")
             version = current.version + 1
 

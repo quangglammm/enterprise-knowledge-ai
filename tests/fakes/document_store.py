@@ -64,6 +64,7 @@ class InMemoryDocumentStore:
             DocumentChunk.model_validate(c.model_dump() | {"access": document.access})
             for c in self._chunks.get(key, [])
         ]
+        self._prune_superseded(document.tenant_id, document.id)
 
     async def replace_chunks(
         self,
@@ -80,6 +81,7 @@ class InMemoryDocumentStore:
             self._embeddings.pop(old.id, None)
         self._chunks[key] = sorted(chunks, key=lambda c: c.chunk_index)
         self._embeddings.update({e.chunk_id: e for e in embeddings})
+        self._prune_superseded(document.tenant_id, document.id)
 
     async def list_chunks(
         self, tenant_id: TenantId, document_id: DocumentId, version: int
@@ -128,6 +130,16 @@ class InMemoryDocumentStore:
         return serving_version(
             d for (t, i, _), d in self._documents.items() if t == tenant_id and i == document_id
         )
+
+    def _prune_superseded(self, tenant_id: TenantId, document_id: DocumentId) -> None:
+        """Drop chunks of versions older than the serving one (ADR-0008)."""
+        serving = self._serving_version(tenant_id, document_id)
+        if serving is None:
+            return
+        for key in list(self._chunks):
+            if key[0] == tenant_id and key[1] == document_id and key[2] < serving:
+                for chunk in self._chunks.pop(key):
+                    self._embeddings.pop(chunk.id, None)
 
 
 def _key(document: Document) -> _Key:

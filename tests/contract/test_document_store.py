@@ -24,10 +24,9 @@ from tests.fakes.embedder import HashEmbedder
 OTHER_TENANT = TenantId("other-co")
 
 
-async def index(store: Store, embedder: HashEmbedder, document: Document, *texts: str) -> Document:
-    """Add the document version if new, then index it with the given chunk texts."""
-    with contextlib.suppress(DocumentAlreadyExistsError):
-        await store.add_document(document)
+async def chunk_set(
+    embedder: HashEmbedder, document: Document, *texts: str
+) -> tuple[list[DocumentChunk], list[Embedding]]:
     chunks = [
         DocumentChunk.for_document(document, index=i, text=t, source=SourceLocation(page=1))
         for i, t in enumerate(texts)
@@ -37,7 +36,14 @@ async def index(store: Store, embedder: HashEmbedder, document: Document, *texts
         Embedding(chunk_id=c.id, model=MODEL, dimension=embedder.dimension, vector=v)
         for c, v in zip(chunks, vectors, strict=True)
     ]
-    await store.replace_chunks(document, chunks, embeddings)
+    return chunks, embeddings
+
+
+async def index(store: Store, embedder: HashEmbedder, document: Document, *texts: str) -> Document:
+    """Add the document version if new, then index it with the given chunk texts."""
+    with contextlib.suppress(DocumentAlreadyExistsError):
+        await store.add_document(document)
+    await store.replace_chunks(document, *await chunk_set(embedder, document, *texts))
     indexed = document.with_status(DocumentStatus.INDEXED, now=NOW)
     await store.update_document(indexed)
     return indexed
@@ -302,6 +308,54 @@ async def test_failed_new_version_does_not_hide_previous_one(
     )
 
     assert [h.document_version for h in hits] == [1]
+
+
+# --- stale data (ING-03, ADR-0008) ----------------------------------------------------
+
+
+async def test_indexing_a_new_version_prunes_chunks_of_older_versions(
+    store: Store, embedder: HashEmbedder
+) -> None:
+    await index(store, embedder, make_document(version=1), "annual leave is 12 days")
+
+    await index(
+        store, embedder, make_document(version=2, checksum="1" * 64), "annual leave is 14 days"
+    )
+
+    assert await store.list_chunks(TENANT, DocumentId("doc-1"), 1) == []
+    assert [c.text for c in await store.list_chunks(TENANT, DocumentId("doc-1"), 2)] == [
+        "annual leave is 14 days"
+    ]
+
+
+@pytest.mark.parametrize("failed", [False, True], ids=["pending", "failed"])
+async def test_unfinished_new_version_prunes_nothing(
+    store: Store, embedder: HashEmbedder, failed: bool
+) -> None:
+    await index(store, embedder, make_document(version=1), "annual leave is 12 days")
+    v2 = make_document(version=2, checksum="1" * 64)
+    await store.add_document(v2)
+    await store.replace_chunks(v2, *await chunk_set(embedder, v2, "annual leave is 14 days"))
+    if failed:
+        await store.update_document(
+            v2.with_status(DocumentStatus.FAILED, now=NOW, error_category="indexing_error")
+        )
+
+    assert [c.text for c in await store.list_chunks(TENANT, DocumentId("doc-1"), 1)] == [
+        "annual leave is 12 days"
+    ]
+
+
+async def test_delete_removes_chunks_of_every_version(store: Store, embedder: HashEmbedder) -> None:
+    await index(store, embedder, make_document(version=1), "annual leave is 12 days")
+    v2 = make_document(version=2, checksum="1" * 64)
+    await store.add_document(v2)
+    await store.replace_chunks(v2, *await chunk_set(embedder, v2, "annual leave is 14 days"))
+
+    await store.delete_document(TENANT, DocumentId("doc-1"))
+
+    assert await store.list_chunks(TENANT, DocumentId("doc-1"), 1) == []
+    assert await store.list_chunks(TENANT, DocumentId("doc-1"), 2) == []
 
 
 async def test_replacing_chunks_with_fewer_removes_stale_ones(

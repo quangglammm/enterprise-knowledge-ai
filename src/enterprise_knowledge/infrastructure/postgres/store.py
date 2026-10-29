@@ -1,7 +1,8 @@
 """PostgreSQL implementation of DocumentRepository and ChunkSearch (ADR-0003, ADR-0007).
 
 Every write that can change what search should see (status, access policy, chunks) ends
-with ``_recompute_searchable`` in the same transaction.
+with ``_apply_serving_rule`` in the same transaction: it prunes chunks of superseded
+versions (ADR-0008) and recomputes ``searchable``.
 """
 
 import logging
@@ -86,6 +87,19 @@ JOIN documents d
   ON d.tenant_id = hits.tenant_id AND d.id = hits.document_id AND d.version = hits.document_version
 ORDER BY hits.distance, hits.id
 """).format(columns=_CHUNK_COLUMNS)
+
+# Chunks of versions older than the serving one are stale (ADR-0008). Without an indexed
+# version the comparison is NULL and nothing is pruned.
+_PRUNE_SUPERSEDED_SQL = """
+DELETE FROM chunks c
+USING (
+    SELECT max(version) FILTER (WHERE status = 'indexed') AS version
+    FROM documents WHERE tenant_id = %(tenant)s AND id = %(document)s
+) s
+WHERE c.tenant_id = %(tenant)s
+  AND c.document_id = %(document)s
+  AND c.document_version < s.version
+"""
 
 _RECOMPUTE_SEARCHABLE_SQL = """
 UPDATE chunks c
@@ -209,7 +223,7 @@ class PostgresDocumentStore:
                 " AND document_version = %(version)s",
                 params,
             )
-            await _recompute_searchable(conn, document.tenant_id, document.id)
+            await _apply_serving_rule(conn, document.tenant_id, document.id)
 
     async def replace_chunks(
         self,
@@ -248,7 +262,7 @@ class PostgresDocumentStore:
                     " %s, %s, %s, %s, %s, %s, %s, %s::vector)",
                     [_chunk_params(c, vectors[c.id]) for c in chunks],
                 )
-            await _recompute_searchable(conn, document.tenant_id, document.id)
+            await _apply_serving_rule(conn, document.tenant_id, document.id)
 
     async def list_chunks(
         self, tenant_id: TenantId, document_id: DocumentId, version: int
@@ -322,10 +336,12 @@ async def _run_search(conn: AsyncConnection[Any], params: dict[str, Any]) -> lis
     return await cur.fetchall()
 
 
-async def _recompute_searchable(
+async def _apply_serving_rule(
     conn: AsyncConnection[Any], tenant_id: TenantId, document_id: DocumentId
 ) -> None:
-    await conn.execute(_RECOMPUTE_SEARCHABLE_SQL, {"tenant": tenant_id, "document": document_id})
+    params = {"tenant": tenant_id, "document": document_id}
+    await conn.execute(_PRUNE_SUPERSEDED_SQL, params)
+    await conn.execute(_RECOMPUTE_SEARCHABLE_SQL, params)
 
 
 async def _check_dimension(conn: AsyncConnection[Any], expected: int) -> None:

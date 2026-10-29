@@ -9,7 +9,7 @@ from enterprise_knowledge.api.errors import ForbiddenError
 from enterprise_knowledge.api.identity import current_principal
 from enterprise_knowledge.api.services import Services, get_services
 from enterprise_knowledge.domain.access import AccessPolicy, Principal
-from enterprise_knowledge.domain.documents import Document, DocumentChunk
+from enterprise_knowledge.domain.documents import Document, DocumentChunk, DocumentStatus
 from enterprise_knowledge.domain.errors import DocumentNotFoundError
 from enterprise_knowledge.domain.ids import DocumentId
 from enterprise_knowledge.domain.retrieval import RetrievedEvidence
@@ -176,6 +176,14 @@ async def list_chunks(
     return [ChunkOut.of(c) for c in chunks if principal.can_access(c.access)]
 
 
+@router.delete(
+    "/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT, responses=_ERRORS
+)
+async def delete_document(document_id: str, principal: PrincipalDep, services: ServicesDep) -> None:
+    """Remove every version from search and storage. Deleting again also returns 204."""
+    await services.delete(principal=principal, document_id=DocumentId(document_id))
+
+
 @router.post("/search", responses=_ERRORS)
 async def search(body: SearchIn, principal: PrincipalDep, services: ServicesDep) -> SearchOut:
     hits = await services.search(principal, body.query, k=body.k)
@@ -203,6 +211,10 @@ async def _readable_document(
     """The current version, or 404 when absent, deleted or not readable by the caller.
     Unreadable and missing look the same, so callers cannot probe for documents."""
     document = await services.documents.get_document(principal.tenant_id, document_id)
-    if document is None or not principal.can_access(document.access):
+    if (
+        document is None
+        or document.status is DocumentStatus.DELETED
+        or not principal.can_access(document.access)
+    ):
         raise DocumentNotFoundError(f"document {document_id} not found")
     return document

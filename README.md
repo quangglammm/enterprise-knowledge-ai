@@ -70,8 +70,9 @@ All settings are environment variables prefixed with `EKA_`; see [`.env.example`
 | `GET /health/live` | Process is running. Never checks dependencies. |
 | `GET /health/ready` | Instance can serve traffic. Checks the database; `503` if any check fails. |
 | `POST /v1/documents` | Upload a file (`multipart/form-data`: `file`, `allowed_groups`, optional `title`, optional `document_id` for a new version). `201` when indexed, `200` when identical content is already indexed. |
-| `GET /v1/documents/{id}` | Current version's metadata and status. |
-| `GET /v1/documents/{id}/chunks` | Chunks of the current (or `?version=`) version, with page, section and character offsets. |
+| `GET /v1/documents/{id}` | Current version's metadata and status. `404` once deleted. |
+| `GET /v1/documents/{id}/chunks` | Chunks of the current (or `?version=`) version, with page, section and character offsets. Superseded versions have no chunks (ADR-0008). |
+| `DELETE /v1/documents/{id}` | Remove every version from search and storage. `204`, also when already deleted. |
 | `POST /v1/search` | `{"query": "...", "k": 5}` returns access-checked evidence. |
 
 Interactive docs are at `/docs` when the API runs.
@@ -145,6 +146,7 @@ More packages (`generation`, `agents`, `evaluation`, `worker`) are added when th
 - [ADR-0005: Bilingual demo corpus](docs/adr/0005-bilingual-demo-corpus.md)
 - [ADR-0006: Document parsing and chunking](docs/adr/0006-document-parsing-and-chunking.md)
 - [ADR-0007: Postgres persistence and vector search](docs/adr/0007-postgres-persistence.md)
+- [ADR-0008: Document lifecycle: superseded versions and deletion](docs/adr/0008-document-lifecycle.md)
 
 ## Data
 

@@ -1,58 +1,17 @@
 """IngestDocument: bytes in, an indexed, searchable document version out."""
 
-from datetime import UTC, datetime
-
 import pytest
 
 from enterprise_knowledge.domain.documents import DocumentStatus
 from enterprise_knowledge.domain.errors import DocumentNotFoundError
 from enterprise_knowledge.domain.ids import DocumentId
 from enterprise_knowledge.ingestion.errors import CorruptDocumentError
-from enterprise_knowledge.ingestion.ingest import (
-    HEADER_SEPARATOR,
-    IngestDocument,
-    blob_key,
-    embedding_input,
-)
+from enterprise_knowledge.ingestion.ingest import HEADER_SEPARATOR, blob_key, embedding_input
 from tests.factories import TENANT, make_policy, make_principal
-from tests.fakes.blob_store import InMemoryBlobStore
-from tests.fakes.document_store import InMemoryDocumentStore
-from tests.fakes.embedder import HashEmbedder
-from tests.unit.ingestion.conftest import fixture_bytes
+from tests.unit.ingestion.conftest import Harness, fixture_bytes
 
-T0 = datetime(2026, 3, 1, tzinfo=UTC)
 PDF = fixture_bytes("leave-policy-vi.pdf")
 DOCX = fixture_bytes("vpn-runbook-en.docx")
-
-
-class Harness:
-    def __init__(self) -> None:
-        self.store = InMemoryDocumentStore()
-        self.blobs = InMemoryBlobStore()
-        self.embedder = HashEmbedder()
-        self.ids = iter(f"doc-{i}" for i in range(1, 100))
-        self.ingest = IngestDocument(
-            documents=self.store,
-            embedder=self.embedder,
-            blobs=self.blobs,
-            clock=lambda: T0,
-            new_document_id=lambda: DocumentId(next(self.ids)),
-        )
-
-    async def search(self, query: str, *groups: str) -> list[tuple[str, int]]:
-        """Distinct (document, version) pairs among the hits, in rank order."""
-        hits = await self.store.search(
-            make_principal(TENANT, *groups),
-            await self.embedder.embed_query(query),
-            k=5,
-            embedding_model=self.embedder.model,
-        )
-        return list(dict.fromkeys((h.document_id, h.document_version) for h in hits))
-
-
-@pytest.fixture
-def harness() -> Harness:
-    return Harness()
 
 
 async def test_new_document_is_indexed_stored_and_searchable(harness: Harness) -> None:
@@ -63,7 +22,7 @@ async def test_new_document_is_indexed_stored_and_searchable(harness: Harness) -
     assert (document.id, document.version, document.status) == ("doc-1", 1, DocumentStatus.INDEXED)
     assert document.title == "Quy chế nghỉ phép"
     assert result.chunk_count == len(await harness.store.list_chunks(TENANT, document.id, 1)) > 0
-    assert await harness.blobs.get(blob_key(document)) == PDF
+    assert await harness.blobs.get(blob_key(TENANT, document.id, 1)) == PDF
     assert ("doc-1", 1) in await harness.search("số ngày nghỉ phép năm")
 
 
@@ -119,6 +78,29 @@ async def test_unknown_document_id_is_rejected(harness: Harness) -> None:
         await harness.ingest(
             data=PDF, filename="x.pdf", access=make_policy(), document_id=DocumentId("missing")
         )
+
+
+async def test_deleted_document_cannot_get_a_new_version(harness: Harness) -> None:
+    await harness.ingest(data=PDF, filename="leave.pdf", access=make_policy())
+    await harness.delete(principal=make_principal(), document_id=DocumentId("doc-1"))
+
+    with pytest.raises(DocumentNotFoundError):
+        await harness.ingest(
+            data=DOCX, filename="v2.docx", access=make_policy(), document_id=DocumentId("doc-1")
+        )
+
+    assert await harness.search("VPN client gateway") == []
+
+
+async def test_same_file_after_delete_is_indexed_as_a_new_document(harness: Harness) -> None:
+    await harness.ingest(data=PDF, filename="leave.pdf", access=make_policy())
+    await harness.delete(principal=make_principal(), document_id=DocumentId("doc-1"))
+
+    again = await harness.ingest(data=PDF, filename="leave.pdf", access=make_policy())
+
+    assert not again.duplicate
+    assert (again.document.id, again.document.version) == ("doc-2", 1)
+    assert await harness.search("số ngày nghỉ phép năm") == [("doc-2", 1)]
 
 
 async def test_unparseable_upload_stores_nothing(harness: Harness) -> None:
