@@ -4,7 +4,7 @@ A document-grounded knowledge assistant. It ingests enterprise documents asynchr
 
 **Stack:** Python 3.12 · FastAPI · PostgreSQL + pgvector · Amazon Bedrock · AWS (S3, SQS, ECS Fargate, CDK) · OpenTelemetry
 
-> Status: **v0.1 in progress (Week 1, foundation).** Only the API skeleton and health endpoints exist so far. See [the roadmap](#roadmap).
+> Status: **v0.1 in progress (Week 1, foundation).** Only the API skeleton and health endpoints exist so far. See [the roadmap](#roadmap) and the full [implementation plan](docs/implementation-plan.md).
 
 ## Quick start
 
@@ -82,8 +82,9 @@ More packages (`domain`, `ingestion`, `retrieval`, `generation`, `agents`, `eval
 | 9 | Reliability and security | Tracing, injection tests, cost and CI regression gates |
 | 10 | Case study | Docs, benchmark write-up, demo, teardown |
 
-## Architecture decisions
+## Plan and architecture decisions
 
+- [Implementation plan](docs/implementation-plan.md)
 - [ADR-0001: Foundation stack and repository structure](docs/adr/0001-foundation-stack.md)
 
 ## Data
