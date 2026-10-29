@@ -12,6 +12,8 @@ from enterprise_knowledge.domain.documents import (
     Embedding,
     Language,
     SourceLocation,
+    serving_version,
+    validate_chunk_set,
 )
 from enterprise_knowledge.domain.ids import ChunkId, DocumentId, chunk_id_for
 from tests.factories import NOW, make_document, make_policy
@@ -143,3 +145,47 @@ def test_document_requires_version_one_or_more() -> None:
             created_at=NOW,
             updated_at=NOW,
         )
+
+
+def test_serving_version_is_highest_indexed() -> None:
+    versions = [
+        make_document(version=1, status=DocumentStatus.INDEXED),
+        make_document(version=2, status=DocumentStatus.INDEXED),
+        make_document(version=3, status=DocumentStatus.PENDING),
+    ]
+
+    assert serving_version(versions) == 2
+    assert serving_version([make_document(status=DocumentStatus.DELETED)]) is None
+
+
+def _chunk_and_embedding(
+    document: Document, index: int, model: str = "m"
+) -> tuple[DocumentChunk, Embedding]:
+    chunk = DocumentChunk.for_document(document, index=index, text="x", source=SourceLocation())
+    return chunk, Embedding(chunk_id=chunk.id, model=model, dimension=1, vector=(1.0,))
+
+
+def test_validate_chunk_set_accepts_well_formed_set() -> None:
+    document = make_document()
+    pairs = [_chunk_and_embedding(document, i) for i in range(3)]
+
+    validate_chunk_set(document, [c for c, _ in pairs], [e for _, e in pairs])
+
+
+def test_validate_chunk_set_rejects_mixed_embedding_models() -> None:
+    document = make_document()
+    c0, e0 = _chunk_and_embedding(document, 0, "model-a")
+    c1, e1 = _chunk_and_embedding(document, 1, "model-b")
+
+    with pytest.raises(ValueError, match="one model"):
+        validate_chunk_set(document, [c0, c1], [e0, e1])
+
+
+def test_validate_chunk_set_rejects_duplicates_and_missing_embeddings() -> None:
+    document = make_document()
+    chunk, embedding = _chunk_and_embedding(document, 0)
+
+    with pytest.raises(ValueError, match="duplicate"):
+        validate_chunk_set(document, [chunk, chunk], [embedding, embedding])
+    with pytest.raises(ValueError, match="embedding"):
+        validate_chunk_set(document, [chunk], [])

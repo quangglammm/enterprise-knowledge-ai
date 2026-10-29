@@ -13,6 +13,8 @@ from enterprise_knowledge.domain.documents import (
     DocumentChunk,
     DocumentStatus,
     Embedding,
+    serving_version,
+    validate_chunk_set,
 )
 from enterprise_knowledge.domain.errors import DocumentAlreadyExistsError, DocumentNotFoundError
 from enterprise_knowledge.domain.ids import ChunkId, DocumentId, TenantId
@@ -72,7 +74,7 @@ class InMemoryDocumentStore:
         key = _key(document)
         if key not in self._documents:
             raise DocumentNotFoundError(f"{document.id} v{document.version} not found")
-        _validate_chunk_set(document, chunks, embeddings)
+        validate_chunk_set(document, chunks, embeddings)
 
         for old in self._chunks.get(key, []):
             self._embeddings.pop(old.id, None)
@@ -109,10 +111,7 @@ class InMemoryDocumentStore:
         scored: list[tuple[float, DocumentChunk, Document]] = []
         for key, chunks in self._chunks.items():
             document = self._documents[key]
-            current = await self.get_document(document.tenant_id, document.id)
-            if current is None or current.version != document.version:
-                continue
-            if document.status is not DocumentStatus.INDEXED:
+            if document.version != self._serving_version(document.tenant_id, document.id):
                 continue
             for chunk in chunks:
                 if not principal.can_access(chunk.access):  # filter before ranking
@@ -125,25 +124,14 @@ class InMemoryDocumentStore:
         scored.sort(key=lambda item: (-item[0], item[1].id))
         return [_evidence(score, chunk, document) for score, chunk, document in scored[:k]]
 
+    def _serving_version(self, tenant_id: TenantId, document_id: DocumentId) -> int | None:
+        return serving_version(
+            d for (t, i, _), d in self._documents.items() if t == tenant_id and i == document_id
+        )
+
 
 def _key(document: Document) -> _Key:
     return (document.tenant_id, document.id, document.version)
-
-
-def _validate_chunk_set(
-    document: Document, chunks: Sequence[DocumentChunk], embeddings: Sequence[Embedding]
-) -> None:
-    for chunk in chunks:
-        if (chunk.document_id, chunk.document_version) != (document.id, document.version):
-            raise ValueError(
-                f"chunk {chunk.id} does not belong to {document.id} v{document.version}"
-            )
-    chunk_ids = [c.id for c in chunks]
-    embedding_ids = [e.chunk_id for e in embeddings]
-    if len(set(chunk_ids)) != len(chunk_ids):
-        raise ValueError("duplicate chunks")
-    if sorted(chunk_ids) != sorted(embedding_ids):
-        raise ValueError("every chunk needs exactly one embedding")
 
 
 def _cosine(a: Vector, b: Vector) -> float:

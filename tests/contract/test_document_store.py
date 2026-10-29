@@ -1,13 +1,10 @@
 """Behavior every DocumentRepository + ChunkSearch implementation must have.
 
-Parametrized over implementations: the in-memory fake now, the Postgres adapter from
-Week 1 Day 4 (added to STORES with the integration marker). A fake that drifts from
-production semantics fails here.
+The ``store`` fixture (conftest.py) runs each test against the in-memory fake and, for
+``-m integration``, against Postgres. A fake that drifts from production semantics fails here.
 """
 
 import contextlib
-from collections.abc import Callable
-from typing import Protocol
 
 import pytest
 
@@ -20,31 +17,11 @@ from enterprise_knowledge.domain.documents import (
 )
 from enterprise_knowledge.domain.errors import DocumentAlreadyExistsError, DocumentNotFoundError
 from enterprise_knowledge.domain.ids import DocumentId, TenantId
-from enterprise_knowledge.domain.ports import ChunkSearch, DocumentRepository
+from tests.contract.conftest import MODEL, Store
 from tests.factories import NOW, TENANT, make_document, make_policy, make_principal
-from tests.fakes.document_store import InMemoryDocumentStore
 from tests.fakes.embedder import HashEmbedder
 
-MODEL = "fake-hash"
 OTHER_TENANT = TenantId("other-co")
-
-
-class Store(DocumentRepository, ChunkSearch, Protocol):
-    """Both ports; production uses one Postgres adapter for both."""
-
-
-STORES: list[Callable[[], Store]] = [InMemoryDocumentStore]
-
-
-@pytest.fixture(params=STORES, ids=lambda factory: factory.__name__)
-def store(request: pytest.FixtureRequest) -> Store:
-    factory: Callable[[], Store] = request.param
-    return factory()
-
-
-@pytest.fixture
-def embedder() -> HashEmbedder:
-    return HashEmbedder(model=MODEL)
 
 
 async def index(store: Store, embedder: HashEmbedder, document: Document, *texts: str) -> Document:
@@ -285,3 +262,85 @@ async def test_k_must_be_positive(store: Store, embedder: HashEmbedder) -> None:
         await store.search(
             make_principal(), await embedder.embed_query("x"), k=0, embedding_model=MODEL
         )
+
+
+# --- serving rule (ADR-0007) --------------------------------------------------------
+
+
+async def test_previous_version_keeps_serving_while_new_version_is_pending(
+    store: Store, embedder: HashEmbedder
+) -> None:
+    await index(store, embedder, make_document(version=1), "annual leave is 12 days")
+    await store.add_document(make_document(version=2, checksum="1" * 64))
+
+    pending = await store.search(
+        make_principal(), await embedder.embed_query("annual leave"), k=5, embedding_model=MODEL
+    )
+    await index(
+        store, embedder, make_document(version=2, checksum="1" * 64), "annual leave 14 days"
+    )
+    indexed = await store.search(
+        make_principal(), await embedder.embed_query("annual leave"), k=5, embedding_model=MODEL
+    )
+
+    assert [h.document_version for h in pending] == [1]
+    assert [h.document_version for h in indexed] == [2]
+
+
+async def test_failed_new_version_does_not_hide_previous_one(
+    store: Store, embedder: HashEmbedder
+) -> None:
+    await index(store, embedder, make_document(version=1), "expense claims within 30 days")
+    v2 = make_document(version=2, checksum="1" * 64)
+    await store.add_document(v2)
+    await store.update_document(
+        v2.with_status(DocumentStatus.FAILED, now=NOW, error_category="corrupt_document")
+    )
+
+    hits = await store.search(
+        make_principal(), await embedder.embed_query("expense claims"), k=5, embedding_model=MODEL
+    )
+
+    assert [h.document_version for h in hits] == [1]
+
+
+async def test_replacing_chunks_with_fewer_removes_stale_ones(
+    store: Store, embedder: HashEmbedder
+) -> None:
+    document = make_document()
+    await index(store, embedder, document, "vpn setup", "vpn error 809", "vpn gateways")
+
+    await index(store, embedder, document, "vpn setup only")
+
+    assert [c.text for c in await store.list_chunks(TENANT, document.id, 1)] == ["vpn setup only"]
+    hits = await store.search(
+        make_principal(), await embedder.embed_query("vpn error 809"), k=5, embedding_model=MODEL
+    )
+    assert [h.text for h in hits] == ["vpn setup only"]
+
+
+async def test_delete_is_idempotent_and_keeps_history(store: Store, embedder: HashEmbedder) -> None:
+    await index(store, embedder, make_document(), "printer guide")
+
+    await store.delete_document(TENANT, DocumentId("doc-1"))
+    await store.delete_document(TENANT, DocumentId("doc-1"))
+
+    deleted = await store.get_document(TENANT, DocumentId("doc-1"))
+    assert deleted is not None
+    assert deleted.status is DocumentStatus.DELETED
+    assert await store.list_chunks(TENANT, DocumentId("doc-1"), 1) == []
+
+
+async def test_search_returns_full_evidence(store: Store, embedder: HashEmbedder) -> None:
+    document = make_document(title="Quy chế nghỉ phép")
+    await index(store, embedder, document, "Nhân viên được nghỉ 12 ngày phép năm")
+
+    [hit] = await store.search(
+        make_principal(), await embedder.embed_query("nghỉ phép năm"), k=1, embedding_model=MODEL
+    )
+
+    assert hit.title == "Quy chế nghỉ phép"
+    assert hit.text == "Nhân viên được nghỉ 12 ngày phép năm"
+    assert hit.access == document.access
+    assert hit.source.page == 1
+    assert 0 < hit.score <= 1.0001

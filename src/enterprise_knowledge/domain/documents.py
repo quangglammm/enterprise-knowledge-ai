@@ -1,6 +1,7 @@
 """Documents, their chunks and embeddings."""
 
 import math
+from collections.abc import Iterable, Sequence
 from enum import StrEnum
 from typing import Annotated, Self
 
@@ -168,3 +169,33 @@ class Embedding(BaseModel):
         if not all(math.isfinite(v) for v in self.vector):
             raise ValueError("vector values must be finite")
         return self
+
+
+def serving_version(versions: Iterable[Document]) -> int | None:
+    """The version search should serve: the highest one that is indexed (ADR-0007).
+
+    A newer pending or failed version does not hide the previous indexed one, so a
+    re-upload is never a search outage for that document.
+    """
+    indexed = [d.version for d in versions if d.status is DocumentStatus.INDEXED]
+    return max(indexed, default=None)
+
+
+def validate_chunk_set(
+    document: Document, chunks: Sequence[DocumentChunk], embeddings: Sequence[Embedding]
+) -> None:
+    """Rules every repository enforces before replacing a version's chunks."""
+    for chunk in chunks:
+        if (chunk.document_id, chunk.document_version) != (document.id, document.version):
+            raise ValueError(
+                f"chunk {chunk.id} does not belong to {document.id} v{document.version}"
+            )
+        if chunk.access.tenant_id != document.tenant_id:
+            raise ValueError(f"chunk {chunk.id} belongs to another tenant")
+    chunk_ids = [c.id for c in chunks]
+    if len(set(chunk_ids)) != len(chunk_ids):
+        raise ValueError("duplicate chunks")
+    if sorted(chunk_ids) != sorted(e.chunk_id for e in embeddings):
+        raise ValueError("every chunk needs exactly one embedding")
+    if len({e.model for e in embeddings}) > 1:
+        raise ValueError("all embeddings of a version must come from one model")

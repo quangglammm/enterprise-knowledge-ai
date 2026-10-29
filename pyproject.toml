@@ -8,6 +8,8 @@ requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4>=4.15.0",
     "fastapi>=0.162.0",
+    "psycopg-pool>=3.3.3",
+    "psycopg[binary]>=3.3.6",
     "pydantic-settings>=2.16.2",
     "pypdf>=6.21.4",
     "python-docx>=1.2.0",
@@ -16,6 +18,7 @@ dependencies = [
 
 [project.scripts]
 eka-api = "enterprise_knowledge.api.__main__:main"
+eka-migrate = "enterprise_knowledge.infrastructure.postgres.migrate:main"
 
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]
@@ -52,6 +55,7 @@ ban-relative-imports = "all"
 "botocore".msg = "AWS SDK only in infrastructure/ adapters behind a domain port (ADR-0002)."
 "sqlalchemy".msg = "Database access only in infrastructure/ (ADR-0002)."
 "psycopg".msg = "Database access only in infrastructure/ (ADR-0002)."
+"psycopg_pool".msg = "Database access only in infrastructure/ (ADR-0002)."
 "asyncpg".msg = "Database access only in infrastructure/ (ADR-0002)."
 "pgvector".msg = "Vector store access only in infrastructure/ (ADR-0002)."
 "anthropic".msg = "Model SDKs only in infrastructure/ behind ModelProvider (ADR-0002)."
@@ -73,7 +77,7 @@ mypy_path = "src"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers -m 'not integration'"
 markers = [
     "integration: needs local services (Postgres) from docker compose",
 ]
@@ -112,7 +116,7 @@ source_modules = ["enterprise_knowledge.domain.**"]
 forbidden_modules = [
     "fastapi", "starlette", "uvicorn", "pydantic_settings",
     "boto3", "botocore", "aioboto3",
-    "sqlalchemy", "psycopg", "asyncpg", "pgvector", "alembic",
+    "sqlalchemy", "psycopg", "psycopg_pool", "asyncpg", "pgvector", "alembic",
     "httpx", "requests", "anthropic", "openai", "opensearchpy",
 ]
 allow_indirect_imports = true
@@ -131,7 +135,7 @@ source_modules = [
 forbidden_modules = [
     "fastapi", "starlette", "uvicorn",
     "boto3", "botocore", "aioboto3",
-    "sqlalchemy", "psycopg", "asyncpg", "pgvector",
+    "sqlalchemy", "psycopg", "psycopg_pool", "asyncpg", "pgvector",
     "httpx", "requests", "anthropic", "openai", "opensearchpy",
 ]
 allow_indirect_imports = true
