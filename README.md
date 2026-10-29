@@ -2,7 +2,9 @@
 
 A document-grounded knowledge assistant. It ingests enterprise documents asynchronously, answers questions with verifiable citations, abstains when evidence is insufficient, routes complex questions through a bounded agent workflow, and measures answer quality, latency, reliability and cost against a versioned benchmark.
 
-**Stack:** Python 3.12 · FastAPI · PostgreSQL + pgvector · Amazon Bedrock · AWS (S3, SQS, ECS Fargate, CDK) · OpenTelemetry
+**Stack:** Python 3.12 · FastAPI · PostgreSQL + pgvector · FPT AI Marketplace (LLM and Vietnamese embeddings) · AWS for deployment (S3, SQS, ECS Fargate, CDK) · OpenTelemetry
+
+**Corpus:** bilingual Vietnamese and English documents from a fictional company, with tenants, access groups and document versions.
 
 > Status: **v0.1 in progress (Week 1, foundation).** Only the API skeleton and health endpoints exist so far. See [the roadmap](#roadmap) and the full [implementation plan](docs/implementation-plan.md).
 
@@ -94,7 +96,7 @@ More packages (`domain`, `ingestion`, `retrieval`, `generation`, `agents`, `eval
 | 5 | Async ingestion | Reliable worker under duplicate events and failures |
 | 6 | Agentic workflow | Bounded workflow for complex questions only |
 | 7 | AWS deployment | Endpoint on ECS Fargate with a demo dataset |
-| 8 | AWS managed services | S3 → SQS → worker and Bedrock end to end |
+| 8 | AWS managed services | S3 → SQS → worker → FPT models end to end in AWS |
 | 9 | Reliability and security | Tracing, injection tests, cost and CI regression gates |
 | 10 | Case study | Docs, benchmark write-up, demo, teardown |
 
@@ -103,6 +105,9 @@ More packages (`domain`, `ingestion`, `retrieval`, `generation`, `agents`, `eval
 - [Implementation plan](docs/implementation-plan.md)
 - [ADR-0001: Foundation stack and repository structure](docs/adr/0001-foundation-stack.md)
 - [ADR-0002: Enforced layered (clean) architecture](docs/adr/0002-enforced-layered-architecture.md)
+- [ADR-0003: Access control model](docs/adr/0003-access-control-model.md)
+- [ADR-0004: Model and embedding providers](docs/adr/0004-model-and-embedding-providers.md)
+- [ADR-0005: Bilingual demo corpus](docs/adr/0005-bilingual-demo-corpus.md)
 
 ## Data
 

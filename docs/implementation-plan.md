@@ -8,7 +8,7 @@ The plan runs 10 weeks at roughly 12–16 hours per week, with an optional two-w
 
 ## 1. Project definition
 
-**Enterprise Knowledge AI Platform** (Python · FastAPI · RAG · Agentic AI · Amazon Bedrock · AWS)
+**Enterprise Knowledge AI Platform** (Python · FastAPI · RAG · Agentic AI · FPT AI Marketplace · AWS)
 
 A document-grounded knowledge assistant that processes enterprise documents asynchronously, answers questions with verifiable citations, uses bounded agent workflows for complex queries, and continuously measures answer quality, latency, reliability and cost.
 
@@ -39,7 +39,7 @@ Each architectural choice should solve a requirement in the target job descripti
 | Client / REST API | FastAPI · authentication · request validation |
 | Ingestion path | S3 → SQS → worker → parsing and indexing |
 | Query path | FastAPI → retrieval → answer or agent workflow |
-| Shared AI and data services | Bedrock · vector search · PostgreSQL · evaluation |
+| Shared AI and data services | FPT AI Marketplace models · vector search · PostgreSQL · evaluation |
 | Operations and delivery | CloudWatch · OpenTelemetry · pytest · GitHub Actions · AWS CDK |
 
 ### Technology choices
@@ -47,7 +47,7 @@ Each architectural choice should solve a requirement in the target job descripti
 | Component | Initial choice | Reason |
 | --- | --- | --- |
 | Backend | Python 3.12+ and FastAPI | Async APIs, type validation and clear service boundaries |
-| Model access | Amazon Bedrock through a provider interface | AWS GenAI integration without coupling business logic to one model |
+| Model access | FPT AI Marketplace through provider ports (ADR-0004) | Vietnamese-tuned embeddings and Vietnam data residency, without coupling business logic to one provider |
 | Document storage | S3 in AWS; local filesystem or MinIO locally | Separates binary documents from application data |
 | Job queue | SQS in AWS; local queue adapter or LocalStack for development | Asynchronous processing and retry handling |
 | Vector retrieval | PostgreSQL with pgvector | Easy local development and reproducible testing |
@@ -75,7 +75,7 @@ Each phase ends with a working deliverable, so the project stays demonstrable if
 | 5 | Asynchronous ingestion | 14–16 | Separate API and worker processes; queued jobs, retry policies and idempotency; duplicate events and malformed documents; reprocessing and deletion tests | Background ingestion is reliable under duplicate events and recoverable failures |
 | 6 | Agentic query workflow | 14–16 | Query routing and workflow state; evidence retrieval and verification steps; bounded iterations, timeouts and model calls; compare direct RAG and agent workflows | Complex questions use a controlled workflow; simple questions stay on direct RAG |
 | 7 | AWS fundamentals and first deployment | 14–16 | IAM, S3, ECR, ECS and CloudWatch basics; containerize API and worker; deploy to ECS Fargate; secrets, networking and budget alerts | A deployed endpoint works with a controlled demo dataset |
-| 8 | AWS ingestion and managed services | 14–16 | S3 events, SQS and dead-letter queue; Bedrock models and embeddings; managed vector search if budget permits; retry handling and alarms | Cloud ingestion and query paths work end to end |
+| 8 | AWS ingestion and managed services | 14–16 | S3 events, SQS and dead-letter queue; FPT model calls from AWS with Secrets Manager; managed vector search if budget permits; retry handling and alarms | Cloud ingestion and query paths work end to end |
 | 9 | Reliability, security and performance | 14–16 | Request tracing, metrics and structured error categories; access control, prompt injection and failure recovery tests; latency, token usage and cost; CI evaluation regression gates | Documented security boundaries and repeatable reliability tests |
 | 10 | Portfolio and technical case study | 12–16 | README, architecture diagram and runbook; benchmark methodology and honest results; demo recording and trade-offs; AWS teardown and cost controls | A reviewer can run, understand, test and evaluate the project from its documentation |
 
@@ -113,7 +113,7 @@ Priorities: **P0** required for the core product; **P1** important for the targe
 | AGENT-02 | P1 | Agents | Verify evidence before final answers | Unsupported claims trigger a retry or abstention; agent outputs use typed schemas; invalid transitions are tested. |
 | OBS-01 | P1 | Observability | Add correlated logs and traces | A request ID connects API, retrieval, model and workflow events; errors have stable categories; sensitive content is not logged by default. |
 | AWS-01 | P1 | AWS | Deploy API and worker on Fargate | Infrastructure is reproducible from CDK; health checks, least-privilege roles and documented teardown instructions. |
-| AWS-02 | P1 | AWS | Connect S3, SQS and Bedrock | A document travels from upload to indexed content in AWS; retries, dead-letter handling and model errors are observable. |
+| AWS-02 | P1 | AWS | Connect S3, SQS and the model provider | A document travels from upload to indexed content in AWS; retries, dead-letter handling and model errors are observable. |
 | CI-01 | P0 | Quality | Build CI quality gates | Pull requests run linting, type checks and unit tests; integration tests are repeatable; benchmark regressions are reported. |
 | SEC-01 | P1 | Security | Test authorization and prompt injection | Unauthorized users cannot retrieve restricted documents; retrieved instructions cannot override system policy or grant tool permissions. |
 
@@ -125,7 +125,7 @@ A single repository keeps the relationship between API, worker, evaluation suite
 
 - `domain/`: document, chunk, job and answer models; no AWS or LLM SDK dependencies.
 - Feature packages (`ingestion/`, `retrieval/`, `generation/`, `agents/`): domain-specific workflows and their use cases.
-- `infrastructure/`: implementations for S3, PostgreSQL, Bedrock and vector search.
+- `infrastructure/`: implementations for S3, PostgreSQL, the FPT model API and vector search.
 - `api/`: HTTP request/response handling only.
 - `worker/`: background job entry point.
 - `evaluation/`: offline benchmark runners and metric calculations.
@@ -163,7 +163,7 @@ Testing is a core product feature. RAG applications have failure modes conventio
 | Empty or corrupt PDF | Typed ingestion failure; worker remains healthy |
 | No relevant chunks | Clear abstention, not an invented answer |
 | Citation references unknown chunk | Response rejected or regenerated |
-| Bedrock throttles request | Bounded retry; no unbounded loop |
+| Model provider throttles request | Bounded retry; no unbounded loop |
 | One agent step fails | Controlled workflow failure or safe fallback |
 | Unauthorized query | Restricted documents never enter model context |
 | Retrieved text contains malicious instructions | Content treated as untrusted evidence |
@@ -213,7 +213,7 @@ Learn each concept immediately before using it.
 | 2 | S3 | Store documents and generated artifacts |
 | 3 | SQS and dead-letter queues | Asynchronous jobs and retry handling |
 | 4 | ECR and ECS Fargate | Deploy containerized API and worker |
-| 5 | Bedrock | Model and embedding calls through AWS permissions |
+| 5 | Secrets Manager | Store the model provider API key; grant read access to the task role only |
 | 6 | CloudWatch | Logs, service health and application metrics |
 | 7 | CDK and IAM policies | Recreate the environment through code |
 | 8 | OpenSearch Serverless | Managed vector retrieval, only if justified |
@@ -240,9 +240,12 @@ Changes made after review, with the reasoning. Each significant one gets an ADR.
 3. **Access control moves to Week 2.** `tenant_id` and ACL fields are part of the chunk schema from the start, because SEC-01 requires filtering inside the vector query. With an HNSW index, selective filters can return fewer than k rows; evaluate pgvector iterative index scans or per-tenant partitioning. Needs an ADR.
 4. **Embedding model and dimension decided before Week 3.** `vector(n)` is fixed in the column type, so every environment uses the same model and dimension, and the CI fake embedder matches it. Store `embedding_model` and `embedding_dim` per chunk. Needs an ADR.
 5. **Demo corpus chosen in Week 1.** The Week 3 benchmark depends on a fixed, versioned, licensed corpus with cross-document overlap and some restricted documents for ACL tests. Needs an ADR.
-6. **Early AWS spike in Week 3–4.** Deploy the health endpoint to Fargate (about 3 hours) to surface IAM, ECR and networking problems before Week 7. Check Bedrock model availability and cross-region inference profiles for the chosen region early.
+6. **Early AWS spike in Week 3–4.** Deploy the health endpoint to Fargate (about 3 hours) to surface IAM, ECR and networking problems before Week 7. Also run the FPT model spike (ADR-0004) at the start of Week 3.
 7. **OpenSearch Serverless out of core scope.** Its minimum capacity charge likely dominates the budget; an ADR justifies pgvector at this scale instead.
 8. **Hybrid retrieval stays in Postgres.** `tsvector` full-text search plus pgvector, merged with reciprocal rank fusion.
 9. **Evaluation records the judge.** EVAL-02 runs record the judge model and prompt version alongside the answer model and dataset version.
 10. **Agent workflow as an explicit state machine.** Typed states and transitions, which makes invalid transitions straightforward to test.
 11. **Architecture enforced by tooling (done, ADR-0002).** import-linter layer and forbidden-import contracts plus ruff banned imports, run in the edit hook, pytest, `/check` and CI.
+12. **Model provider is FPT AI Marketplace (ADR-0004).** AWS is the deployment platform only; Bedrock is not implemented. Embeddings default to `Vietnamese_Embedding` (1024 dimensions), checked against a multilingual candidate in Week 4. The LLM is chosen by a Week 3 structured-output spike.
+13. **Access control model decided (ADR-0003).** Tenant plus allowed groups on every chunk, filtered inside the vector query; the search port requires a `Principal`.
+14. **Bilingual corpus decided (ADR-0005).** A fictional company corpus, about 60% Vietnamese and 40% English, with versions, access groups and cross-lingual benchmark questions. Text is NFC-normalized.

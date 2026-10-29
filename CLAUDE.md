@@ -1,6 +1,6 @@
 # Enterprise Knowledge AI
 
-Portfolio project: a document-grounded knowledge assistant (FastAPI, PostgreSQL + pgvector, Amazon Bedrock, AWS). It ingests documents, answers with validated citations, abstains on weak evidence, and is measured by a versioned benchmark.
+Portfolio project: a document-grounded knowledge assistant (FastAPI, PostgreSQL + pgvector, FPT AI Marketplace models, deployed on AWS). It ingests bilingual Vietnamese/English documents, answers with validated citations, abstains on weak evidence, and is measured by a versioned benchmark.
 
 - Roadmap, backlog IDs (PLAT-01, ING-01, ...) and acceptance criteria: `docs/implementation-plan.md`
 - Decisions: `docs/adr/`. Read the relevant ADR before changing an area it covers.
@@ -30,7 +30,7 @@ All code lives in one package, `src/enterprise_knowledge/`. Layers are enforced 
 
 ```
 api | worker            delivery: parse input, call a use case, map errors; wiring lives here
-infrastructure          adapters (Postgres, S3, SQS, Bedrock) implementing domain ports
+infrastructure          adapters (Postgres, S3, SQS, FPT model API) implementing domain ports
 evaluation > agents > generation
 retrieval | ingestion   core use cases; siblings must not import each other
 config | observability
@@ -51,6 +51,7 @@ Create a package when its first feature lands; do not add empty placeholder modu
 - Agent workflows have explicit limits on steps, model calls and time.
 - Never log document text, prompts, answers or secrets by default. Log IDs, counts and timings.
 - Tests and CI never call paid model APIs. Use deterministic fakes.
+- Normalize text to Unicode NFC at every ingestion and query boundary (Vietnamese diacritics).
 - Never commit `.env`, credentials or AWS account IDs. Never hand-edit `uv.lock`.
 
 ## Git
