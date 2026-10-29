@@ -73,17 +73,20 @@ Every response carries an `X-Request-ID` header. A caller-supplied ID is reused 
 
 ```
 src/enterprise_knowledge/
+  domain/         models, access policy, job state machine, ports (no SDK imports)
   api/            HTTP layer only (routes, middleware, app factory)
   observability/  structured logging, later tracing and metrics
   config.py       typed settings
 tests/
   unit/           fast tests, no external services
+  contract/       behavior every port implementation must have (fakes now, Postgres later)
+  fakes/          in-memory implementations of the ports
   architecture/   import-linter contracts run as a test
 docs/
   adr/            architecture decision records
 ```
 
-More packages (`domain`, `ingestion`, `retrieval`, `generation`, `agents`, `evaluation`, `worker`) are added when their first feature lands, rather than as empty folders.
+More packages (`ingestion`, `retrieval`, `generation`, `agents`, `evaluation`, `worker`) are added when their first feature lands, rather than as empty folders.
 
 ## Roadmap
 
