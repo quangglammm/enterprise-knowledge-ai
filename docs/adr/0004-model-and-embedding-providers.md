@@ -1,6 +1,6 @@
 # ADR-0004: Model and embedding providers
 
-- Status: Accepted (model choice within FPT pending the Week 3 spike)
+- Status: Accepted; LLM chosen by the model trial of 2026-10-29 (see Model trial)
 - Date: 2026-10-29
 
 ## Context
@@ -28,6 +28,26 @@ Use FPT AI Marketplace for both the LLM and embeddings, behind the `ChatModel` a
 - **Bedrock** is not implemented. The ports keep it possible as a future adapter.
 - **AWS** remains the deployment platform. In AWS, the FPT API key lives in Secrets Manager and calls leave the VPC over HTTPS.
 - **Tests and CI** never call FPT. They use deterministic fakes with the same embedding dimension.
+
+## Model trial (2026-10-29)
+
+`scripts/model_trial.py` ran `datasets/model_trial/cases-v1.jsonl` (24 cases: 6 Vietnamese, 5 English, 4 cross-lingual, 5 unanswerable, 4 prompt injection) through the production generation path (`GenerateAnswer`, prompt `answer-v1`), one run per configuration, at temperature 0. Raw results without answer text: `docs/evaluation/model-trial-20261029-145905.json`.
+
+| Model | JSON mode | Passed | Schema-valid (first try) | Abstention | Injection | Citations | Facts | Language | p50 / p95 latency | Tokens in/out per answer |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Llama-3.3-70B-Instruct | off | 22/24 | 100% (100%) | 5/5 | 4/4 | 100% | 94% | 94% | 1.36 s / 2.33 s | 393 / 38 |
+| Llama-3.3-70B-Instruct | on | 22/24 | 100% (100%) | 5/5 | 4/4 | 100% | 94% | 94% | 1.33 s / 2.56 s | 393 / 38 |
+| Qwen2.5-7B-instruct | both | — | — | — | — | — | — | — | — | — |
+| Llama-4-Scout-17B-16E | both | — | — | — | — | — | — | — | — | — |
+
+- **Decision:** `Llama-3.3-70B-Instruct` meets the acceptance criteria (≥ 95% schema-valid after at most one repair; correct abstention on every unanswerable case) and is the LLM. `EKA_LLM_MODEL` stays an explicit setting rather than a code default.
+- **JSON mode:** results were identical with and without `response_format`, and the prompt alone produced valid JSON on the first try in 24/24 cases. `EKA_LLM_JSON_MODE` stays `false`, so the app does not depend on an undocumented provider feature.
+- **Failures (the same two in both modes):**
+  - `x-02`, a real defect: an English question over Vietnamese evidence was answered in Vietnamese. The other 3 cross-lingual cases passed.
+  - `en-05`, a strict check: asked which gateway serves Ho Chi Minh City, the model returned the gateway's address instead of its name `HCM-1`. The answer is grounded, but it is not what was asked.
+- **Observed but not scored:** answers are terse and carry no inline `[E#]` markers, although the prompt asks for them; citations come only from the `citations` list. A later prompt version can address both this and the language slip, and the trial measures the change.
+- **Not compared:** the Qwen and Llama 4 IDs were rejected by the gateway (`model_request_rejected`) on the first call, so they were never evaluated. Their exact IDs or availability on this account must be checked on the marketplace before comparing them.
+- **Limits:** 24 cases and one run per configuration, with deterministic string checks. This is evidence for the choice, not a quality benchmark; EVAL-01/02 measure answer quality. Cost is reported as tokens only, because FPT prices were not recorded.
 
 ## Consequences
 

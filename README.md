@@ -67,7 +67,7 @@ Model providers (ADR-0010). By default everything runs offline: the dev-only has
 
 | Variable | Purpose |
 | --- | --- |
-| `EKA_LLM_API_KEY`, `EKA_LLM_MODEL` | Enables `/v1/answers` with that chat model (chosen by the ADR-0004 model trial). |
+| `EKA_LLM_API_KEY`, `EKA_LLM_MODEL` | Enables `/v1/answers` with that chat model. The ADR-0004 model trial chose `Llama-3.3-70B-Instruct`; rerun it with `uv run python scripts/model_trial.py` (paid calls). |
 | `EKA_LLM_JSON_MODE` | Sends `response_format: json_object`; leave `false` until the trial confirms FPT supports it. |
 | `EKA_EMBEDDING_PROVIDER=fpt`, `EKA_EMBEDDING_API_KEY` | Real embeddings (`Vietnamese_Embedding`, 1024 dimensions). Changing provider or model needs a re-upload of documents. |
 | `EKA_ANSWER_TOP_K`, `EKA_ANSWER_MIN_SCORE`, `EKA_ANSWER_TIMEOUT_SECONDS` | Retrieval depth, evidence score gate and per-answer deadline. |
@@ -114,7 +114,8 @@ src/enterprise_knowledge/
   domain/         models, access policy, job state machine, ports (no SDK imports)
   ingestion/      format detection, parsing, normalization, chunking, IngestDocument and DeleteDocument use cases
   retrieval/      SearchKnowledge use case
-  generation/     AnswerQuestion use case, versioned prompt, answer parsing and citation checks
+  generation/     AnswerQuestion and GenerateAnswer use cases, versioned prompt, answer parsing and citation checks
+  evaluation/     model trial scoring (more benchmark runners come with EVAL-01)
   infrastructure/ adapters: Postgres store and vector search, migrations, blob store, FPT chat and embeddings, dev embedder
   api/            HTTP layer only (routes, middleware, app factory)
   observability/  structured logging, later tracing and metrics
@@ -127,12 +128,14 @@ tests/
   architecture/   import-linter contracts run as a test
 datasets/
   fixtures/       small synthetic bilingual documents for parser tests
-scripts/          fixture generator and other dev tooling
+  model_trial/    versioned grounded-answer cases for the ADR-0004 model trial
+scripts/          fixture generator, FPT smoke test, model trial runner
 docs/
   adr/            architecture decision records
+  evaluation/     recorded trial and benchmark results (no answer text)
 ```
 
-More packages (`agents`, `evaluation`, `worker`) are added when their first feature lands, rather than as empty folders.
+More packages (`agents`, `worker`) are added when their first feature lands, rather than as empty folders.
 
 ## Roadmap
 
