@@ -21,7 +21,7 @@ PrincipalDep = Annotated[Principal, Depends(current_principal)]
 ServicesDep = Annotated[Services, Depends(get_services)]
 _ERRORS: dict[int | str, dict[str, Any]] = {
     code: {"description": "Error body: {error: {category, message, request_id}}"}
-    for code in (401, 403, 404, 413, 415, 422)
+    for code in (401, 403, 404, 409, 413, 415, 422, 502, 503)
 }
 
 

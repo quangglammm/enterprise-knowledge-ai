@@ -10,6 +10,17 @@ from enterprise_knowledge.api.health import ReadinessCheck
 from enterprise_knowledge.config import Environment, Settings
 from enterprise_knowledge.infrastructure.postgres.migrate import migrate
 
+TEST_DATABASE_ENV = "EKA_TEST_DATABASE_URL"
+
+
+@pytest.fixture(autouse=True)
+def _isolate_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests see only the settings they pass. A developer's .env or exported EKA_* values
+    (real model API keys among them) must never reach a test: no paid calls (CLAUDE.md)."""
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
+    for name in [n for n in os.environ if n.startswith("EKA_") and n != TEST_DATABASE_ENV]:
+        monkeypatch.delenv(name)
+
 
 @pytest.fixture
 def settings() -> Settings:
@@ -28,9 +39,6 @@ def make_client(settings: Settings, checks: dict[str, ReadinessCheck] | None = N
 @pytest.fixture
 def client(settings: Settings) -> TestClient:
     return make_client(settings)
-
-
-TEST_DATABASE_ENV = "EKA_TEST_DATABASE_URL"
 
 
 @pytest.fixture(scope="session")

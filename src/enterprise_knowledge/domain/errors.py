@@ -44,3 +44,42 @@ class AccessViolationError(DomainError):
     def __init__(self, chunk_ids: Iterable[ChunkId]) -> None:
         self.chunk_ids = frozenset(chunk_ids)
         super().__init__(f"retrieved chunks outside principal's access: {sorted(self.chunk_ids)}")
+
+
+class ModelProviderError(DomainError):
+    """A model provider call failed (ADR-0010). Messages never carry prompts, bodies or keys.
+
+    ``retryable`` tells a caller (for example the Week 5 worker) whether trying the same
+    work later can succeed; the adapter has already spent its own retry budget.
+    """
+
+    category: ClassVar[str] = "model_provider_error"
+    retryable: ClassVar[bool] = False
+
+
+class ModelRateLimitedError(ModelProviderError):
+    category: ClassVar[str] = "model_rate_limited"
+    retryable: ClassVar[bool] = True
+
+
+class ModelUnavailableError(ModelProviderError):
+    """Server errors, connection failures or timeouts that outlasted the retries."""
+
+    category: ClassVar[str] = "model_unavailable"
+    retryable: ClassVar[bool] = True
+
+
+class ModelAuthenticationError(ModelProviderError):
+    category: ClassVar[str] = "model_auth_failed"
+
+
+class ModelRequestRejectedError(ModelProviderError):
+    """The provider refused the request itself (unknown model, bad parameters)."""
+
+    category: ClassVar[str] = "model_request_rejected"
+
+
+class ModelResponseError(ModelProviderError):
+    """A success status with a body that is not the expected shape."""
+
+    category: ClassVar[str] = "model_invalid_response"

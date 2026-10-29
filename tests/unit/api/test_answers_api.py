@@ -7,6 +7,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from enterprise_knowledge.api.app import create_app
+from enterprise_knowledge.domain.errors import (
+    ModelAuthenticationError,
+    ModelProviderError,
+    ModelRateLimitedError,
+    ModelResponseError,
+    ModelUnavailableError,
+)
 from enterprise_knowledge.generation.answer import AnswerQuestion
 from tests.fakes.chat_model import ScriptedChatModel
 from tests.fakes.document_store import InMemoryDocumentStore
@@ -104,3 +111,25 @@ def test_answers_return_503_when_no_model_is_configured() -> None:
 
     assert response.status_code == 503
     assert response.json()["error"]["category"] == "service_unavailable"
+
+
+@pytest.mark.parametrize(
+    ("error", "status", "category"),
+    [
+        (ModelRateLimitedError("POST /chat/completions returned 429"), 503, "model_rate_limited"),
+        (ModelUnavailableError("POST /chat/completions returned 503"), 502, "model_unavailable"),
+        (ModelAuthenticationError("POST /chat/completions returned 401"), 502, "model_auth_failed"),
+        (ModelResponseError("completion has no choices"), 502, "model_invalid_response"),
+    ],
+    ids=["rate-limited", "unavailable", "auth", "bad-response"],
+)
+def test_provider_failures_map_to_upstream_errors(
+    error: ModelProviderError, status: int, category: str
+) -> None:
+    with Client(error).http as http:
+        upload(http, STAFF)
+
+        response = http.post("/v1/answers", headers=STAFF, json=QUESTION)
+
+    assert response.status_code == status
+    assert response.json()["error"]["category"] == category

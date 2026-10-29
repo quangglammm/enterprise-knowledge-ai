@@ -95,3 +95,29 @@ def test_delete_removes_document_and_files_end_to_end(postgres_url: str, tmp_pat
     assert results == []
     assert lookup.status_code == 404
     assert list((tmp_path / "bamboo-harbor" / doc_id).iterdir()) == []
+
+
+STAFF = {"x-tenant-id": "bamboo-harbor", "x-user-id": "an", "x-user-groups": "all-staff"}
+
+
+def test_answers_return_503_without_an_llm_key(postgres_url: str) -> None:
+    app = create_production_app(settings_for(postgres_url))
+
+    with TestClient(app) as client:
+        response = client.post("/v1/answers", headers=STAFF, json={"question": "nghỉ phép?"})
+
+    assert response.status_code == 503
+
+
+def test_answers_are_wired_when_an_llm_key_is_configured(postgres_url: str) -> None:
+    """With no documents the use case abstains before any model call, so no network."""
+    asyncio.run(reset_database(postgres_url))
+    app = create_production_app(
+        settings_for(postgres_url, llm_api_key="sk-unused", llm_model="Llama-3.3-70B-Instruct")
+    )
+
+    with TestClient(app) as client:
+        response = client.post("/v1/answers", headers=STAFF, json={"question": "nghỉ phép?"})
+
+    assert response.status_code == 200
+    assert response.json()["abstention_reason"] == "no_relevant_evidence"

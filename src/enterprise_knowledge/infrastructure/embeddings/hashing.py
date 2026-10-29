@@ -2,7 +2,7 @@
 
 Texts sharing words get similar vectors, so the system can be exercised end to end without a
 model provider. It has no semantic understanding: never use it for evaluation results. The
-FPT adapter (ADR-0004) replaces it in Week 3.
+real embedder is FptEmbedder (ADR-0010), selected with EKA_EMBEDDING_PROVIDER=fpt.
 """
 
 import hashlib

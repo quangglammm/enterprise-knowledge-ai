@@ -3,7 +3,7 @@
 import pytest
 
 from enterprise_knowledge.domain.documents import DocumentStatus
-from enterprise_knowledge.domain.errors import DocumentNotFoundError
+from enterprise_knowledge.domain.errors import DocumentNotFoundError, ModelRateLimitedError
 from enterprise_knowledge.domain.ids import DocumentId
 from enterprise_knowledge.ingestion.errors import CorruptDocumentError
 from enterprise_knowledge.ingestion.ingest import HEADER_SEPARATOR, blob_key, embedding_input
@@ -127,6 +127,17 @@ async def test_embedding_failure_marks_version_failed_and_keeps_previous(
     assert (current.version, current.status) == (2, DocumentStatus.FAILED)
     assert current.error_category == "indexing_error"
     assert await harness.search("số ngày nghỉ phép năm") == [("doc-1", 1)]
+
+
+async def test_provider_failure_is_recorded_with_its_category(harness: Harness) -> None:
+    harness.embedder.fail_with = ModelRateLimitedError("POST /embeddings returned 429")
+
+    with pytest.raises(ModelRateLimitedError):
+        await harness.ingest(data=PDF, filename="leave.pdf", access=make_policy())
+
+    failed = await harness.store.get_document(TENANT, DocumentId("doc-1"))
+    assert failed is not None
+    assert (failed.status, failed.error_category) == (DocumentStatus.FAILED, "model_rate_limited")
 
 
 async def test_reupload_after_failure_retries_instead_of_deduplicating(harness: Harness) -> None:

@@ -63,6 +63,17 @@ Personal overrides go in `CLAUDE.local.md` and `.claude/settings.local.json` (bo
 
 All settings are environment variables prefixed with `EKA_`; see [`.env.example`](.env.example). Required values (currently `EKA_DATABASE_URL`) have no default, so the process fails at startup with a validation error naming the missing variable. Secrets are never committed: use `.env` locally and a secret manager when deployed.
 
+Model providers (ADR-0010). By default everything runs offline: the dev-only hashing embedder and no chat model, so `/v1/answers` returns `503`. To use FPT AI Marketplace, set in `.env`:
+
+| Variable | Purpose |
+| --- | --- |
+| `EKA_LLM_API_KEY`, `EKA_LLM_MODEL` | Enables `/v1/answers` with that chat model (chosen by the ADR-0004 model trial). |
+| `EKA_LLM_JSON_MODE` | Sends `response_format: json_object`; leave `false` until the trial confirms FPT supports it. |
+| `EKA_EMBEDDING_PROVIDER=fpt`, `EKA_EMBEDDING_API_KEY` | Real embeddings (`Vietnamese_Embedding`, 1024 dimensions). Changing provider or model needs a re-upload of documents. |
+| `EKA_ANSWER_TOP_K`, `EKA_ANSWER_MIN_SCORE`, `EKA_ANSWER_TIMEOUT_SECONDS` | Retrieval depth, evidence score gate and per-answer deadline. |
+
+Tests and CI never call a model provider.
+
 ## API
 
 | Endpoint | Purpose |
@@ -74,7 +85,7 @@ All settings are environment variables prefixed with `EKA_`; see [`.env.example`
 | `GET /v1/documents/{id}/chunks` | Chunks of the current (or `?version=`) version, with page, section and character offsets. Superseded versions have no chunks (ADR-0008). |
 | `DELETE /v1/documents/{id}` | Remove every version from search and storage. `204`, also when already deleted. |
 | `POST /v1/search` | `{"query": "...", "k": 5}` returns access-checked evidence. |
-| `POST /v1/answers` | `{"question": "..."}` returns an answer with validated citations, or `status: insufficient_evidence`. Model failures are `502`/`504`. Returns `503` until a chat model adapter is configured (next: FPT adapter, ADR-0004). |
+| `POST /v1/answers` | `{"question": "..."}` returns an answer with validated citations, or `status: insufficient_evidence`. Model failures are `502`/`504`. Provider failures are `502`, or `503` when throttled. Returns `503` when no chat model is configured (`EKA_LLM_API_KEY`). |
 
 Interactive docs are at `/docs` when the API runs.
 
@@ -104,7 +115,7 @@ src/enterprise_knowledge/
   ingestion/      format detection, parsing, normalization, chunking, IngestDocument and DeleteDocument use cases
   retrieval/      SearchKnowledge use case
   generation/     AnswerQuestion use case, versioned prompt, answer parsing and citation checks
-  infrastructure/ adapters: Postgres store and vector search, migrations, blob store, dev embedder
+  infrastructure/ adapters: Postgres store and vector search, migrations, blob store, FPT chat and embeddings, dev embedder
   api/            HTTP layer only (routes, middleware, app factory)
   observability/  structured logging, later tracing and metrics
   config.py       typed settings
@@ -150,6 +161,7 @@ More packages (`agents`, `evaluation`, `worker`) are added when their first feat
 - [ADR-0007: Postgres persistence and vector search](docs/adr/0007-postgres-persistence.md)
 - [ADR-0008: Document lifecycle: superseded versions and deletion](docs/adr/0008-document-lifecycle.md)
 - [ADR-0009: Grounded answer generation and citation validation](docs/adr/0009-grounded-answer-generation.md)
+- [ADR-0010: FPT model adapters: transport, retries and errors](docs/adr/0010-fpt-model-adapters.md)
 
 ## Data
 

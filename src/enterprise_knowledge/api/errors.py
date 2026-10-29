@@ -17,6 +17,8 @@ from enterprise_knowledge.domain.errors import (
     DocumentAlreadyExistsError,
     DocumentNotFoundError,
     DomainError,
+    ModelProviderError,
+    ModelRateLimitedError,
 )
 from enterprise_knowledge.generation.errors import GenerationError, ModelTimeoutError
 from enterprise_knowledge.ingestion.errors import (
@@ -63,6 +65,9 @@ _DOMAIN_STATUS: list[tuple[type[DomainError], int]] = [
     # The model, not the request, failed (ADR-0009). Never reported as an abstention.
     (ModelTimeoutError, status.HTTP_504_GATEWAY_TIMEOUT),
     (GenerationError, status.HTTP_502_BAD_GATEWAY),
+    # Provider throttling outlasted our retries: the client may try again later (ADR-0010).
+    (ModelRateLimitedError, status.HTTP_503_SERVICE_UNAVAILABLE),
+    (ModelProviderError, status.HTTP_502_BAD_GATEWAY),
 ]
 
 
