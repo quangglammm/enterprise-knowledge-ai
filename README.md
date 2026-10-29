@@ -74,6 +74,7 @@ Every response carries an `X-Request-ID` header. A caller-supplied ID is reused 
 ```
 src/enterprise_knowledge/
   domain/         models, access policy, job state machine, ports (no SDK imports)
+  ingestion/      format detection, PDF/DOCX/HTML/Markdown parsing, normalization, chunking
   api/            HTTP layer only (routes, middleware, app factory)
   observability/  structured logging, later tracing and metrics
   config.py       typed settings
@@ -82,11 +83,14 @@ tests/
   contract/       behavior every port implementation must have (fakes now, Postgres later)
   fakes/          in-memory implementations of the ports
   architecture/   import-linter contracts run as a test
+datasets/
+  fixtures/       small synthetic bilingual documents for parser tests
+scripts/          fixture generator and other dev tooling
 docs/
   adr/            architecture decision records
 ```
 
-More packages (`ingestion`, `retrieval`, `generation`, `agents`, `evaluation`, `worker`) are added when their first feature lands, rather than as empty folders.
+More packages (`retrieval`, `generation`, `agents`, `evaluation`, `worker`) are added when their first feature lands, rather than as empty folders.
 
 ## Roadmap
 
@@ -111,6 +115,7 @@ More packages (`ingestion`, `retrieval`, `generation`, `agents`, `evaluation`, `
 - [ADR-0003: Access control model](docs/adr/0003-access-control-model.md)
 - [ADR-0004: Model and embedding providers](docs/adr/0004-model-and-embedding-providers.md)
 - [ADR-0005: Bilingual demo corpus](docs/adr/0005-bilingual-demo-corpus.md)
+- [ADR-0006: Document parsing and chunking](docs/adr/0006-document-parsing-and-chunking.md)
 
 ## Data
 
