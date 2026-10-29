@@ -21,6 +21,7 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "import-linter>=2.15",
     "mypy>=2.4.1",
     "pytest>=9.2.0",
     "pytest-asyncio>=1.4.1",
@@ -32,10 +33,31 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "ASYNC", "S", "PT", "BLE"]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "ASYNC", "S", "PT", "BLE", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Absolute imports only, so the import graph (and import-linter) reads unambiguously.
+ban-relative-imports = "all"
+
+# Fast, per-file guard for ADR-0002 (shows up in the editor and the post-edit hook).
+# import-linter is the authoritative check of the full import graph.
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"fastapi".msg = "Web framework only in api/ (ADR-0002)."
+"starlette".msg = "Web framework only in api/ (ADR-0002)."
+"boto3".msg = "AWS SDK only in infrastructure/ adapters behind a domain port (ADR-0002)."
+"botocore".msg = "AWS SDK only in infrastructure/ adapters behind a domain port (ADR-0002)."
+"sqlalchemy".msg = "Database access only in infrastructure/ (ADR-0002)."
+"psycopg".msg = "Database access only in infrastructure/ (ADR-0002)."
+"asyncpg".msg = "Database access only in infrastructure/ (ADR-0002)."
+"pgvector".msg = "Vector store access only in infrastructure/ (ADR-0002)."
+"anthropic".msg = "Model SDKs only in infrastructure/ behind ModelProvider (ADR-0002)."
+"openai".msg = "Model SDKs only in infrastructure/ behind ModelProvider (ADR-0002)."
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "TID251"]
+"src/enterprise_knowledge/api/**" = ["TID251"]
+"src/enterprise_knowledge/worker/**" = ["TID251"]
+"src/enterprise_knowledge/infrastructure/**" = ["TID251"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -51,3 +73,61 @@ addopts = "-ra --strict-markers"
 markers = [
     "integration: needs local services (Postgres) from docker compose",
 ]
+
+# ---------------------------------------------------------------------------
+# Architecture contracts (ADR-0002). Checked by `uv run lint-imports` in /check and CI.
+# Packages in parentheses are optional and `pkg.**` wildcards match nothing until the package
+# exists, so contracts apply automatically when a package is created. `pkg.**` skips the
+# package's own __init__.py; the ruff TID251 ban below covers that file.
+# ---------------------------------------------------------------------------
+[tool.importlinter]
+root_package = "enterprise_knowledge"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+id = "layers"
+name = "Clean architecture layers (higher may import lower, never the reverse)"
+type = "layers"
+containers = ["enterprise_knowledge"]
+layers = [
+    "api | (worker)",
+    "(infrastructure)",
+    "(evaluation)",
+    "(agents)",
+    "(generation)",
+    "(retrieval) | (ingestion)",
+    "config | observability",
+    "(domain)",
+]
+
+[[tool.importlinter.contracts]]
+id = "domain-pure"
+name = "Domain has no framework, SDK or database dependencies"
+type = "forbidden"
+source_modules = ["enterprise_knowledge.domain.**"]
+forbidden_modules = [
+    "fastapi", "starlette", "uvicorn", "pydantic_settings",
+    "boto3", "botocore", "aioboto3",
+    "sqlalchemy", "psycopg", "asyncpg", "pgvector", "alembic",
+    "httpx", "requests", "anthropic", "openai", "opensearchpy",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+id = "use-cases-use-ports"
+name = "Use cases depend on ports, not on SDKs or the web framework"
+type = "forbidden"
+source_modules = [
+    "enterprise_knowledge.ingestion.**",
+    "enterprise_knowledge.retrieval.**",
+    "enterprise_knowledge.generation.**",
+    "enterprise_knowledge.agents.**",
+    "enterprise_knowledge.evaluation.**",
+]
+forbidden_modules = [
+    "fastapi", "starlette", "uvicorn",
+    "boto3", "botocore", "aioboto3",
+    "sqlalchemy", "psycopg", "asyncpg", "pgvector",
+    "httpx", "requests", "anthropic", "openai", "opensearchpy",
+]
+allow_indirect_imports = true

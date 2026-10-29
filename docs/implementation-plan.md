@@ -245,3 +245,4 @@ Changes made after review, with the reasoning. Each significant one gets an ADR.
 8. **Hybrid retrieval stays in Postgres.** `tsvector` full-text search plus pgvector, merged with reciprocal rank fusion.
 9. **Evaluation records the judge.** EVAL-02 runs record the judge model and prompt version alongside the answer model and dataset version.
 10. **Agent workflow as an explicit state machine.** Typed states and transitions, which makes invalid transitions straightforward to test.
+11. **Architecture enforced by tooling (done, ADR-0002).** import-linter layer and forbidden-import contracts plus ruff banned imports, run in the edit hook, pytest, `/check` and CI.

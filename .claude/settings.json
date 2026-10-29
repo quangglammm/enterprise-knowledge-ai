@@ -10,6 +10,7 @@
       "Bash(uv lock *)",
       "Bash(uv run ruff *)",
       "Bash(uv run mypy *)",
+      "Bash(uv run lint-imports *)",
       "Bash(uv run pytest *)",
       "Bash(git status *)",
       "Bash(git diff *)",

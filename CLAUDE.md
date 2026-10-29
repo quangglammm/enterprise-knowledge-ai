@@ -15,23 +15,31 @@ uv sync                       # install from uv.lock
 uv run ruff format .          # format
 uv run ruff check --fix .     # lint
 uv run mypy src tests         # type check (strict)
+uv run lint-imports           # architecture contracts
 uv run pytest                 # unit tests
 uv run pytest -m integration  # needs: docker compose up -d postgres
 uv run eka-api                # run the API locally
 uv add <pkg> / uv add --dev <pkg>
 ```
 
-A change is done only when format, lint, mypy and pytest all pass. Use `/check` to run them.
+A change is done only when format, lint, mypy, import contracts and pytest all pass. Use `/check` to run them.
 
 ## Architecture
 
-All code lives in one package, `src/enterprise_knowledge/`. Dependency direction points inward:
+All code lives in one package, `src/enterprise_knowledge/`. Layers are enforced by import-linter contracts in `pyproject.toml` (ADR-0002); a violation fails ruff, pytest, `/check` and CI. Higher layers may import lower ones only:
 
-- `domain/`: Pydantic models and `Protocol` ports. No imports of FastAPI, boto3, SQLAlchemy, LLM SDKs or other project packages.
-- Feature packages (`ingestion/`, `retrieval/`, `generation/`, `agents/`, `evaluation/`): use cases. They depend on `domain` ports, never on concrete adapters.
-- `infrastructure/`: adapters (Postgres, S3, SQS, Bedrock) implementing domain ports.
-- `api/`, `worker/`: thin delivery layers. They parse input, call a use case, and map results and errors.
-- Wiring happens in the app factory or worker entry point, not inside use cases.
+```
+api | worker            delivery: parse input, call a use case, map errors; wiring lives here
+infrastructure          adapters (Postgres, S3, SQS, Bedrock) implementing domain ports
+evaluation > agents > generation
+retrieval | ingestion   core use cases; siblings must not import each other
+config | observability
+domain                  Pydantic models + Protocol ports; stdlib and pydantic only
+```
+
+- Use cases reach the outside world only through ports in `domain`. SDK, database, HTTP and web-framework imports are allowed only in `infrastructure/` (and FastAPI in `api/`).
+- Absolute imports only.
+- Never weaken a contract or add `ignore_imports` to get green. If a contract blocks a sound design, stop and propose an ADR change.
 
 Create a package when its first feature lands; do not add empty placeholder modules.
 

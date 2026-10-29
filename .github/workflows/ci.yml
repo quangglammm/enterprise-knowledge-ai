@@ -35,6 +35,9 @@ jobs:
       - name: Mypy
         run: uv run mypy src tests
 
+      - name: Architecture contracts
+        run: uv run lint-imports
+
       - name: Unit tests
         run: uv run pytest
 

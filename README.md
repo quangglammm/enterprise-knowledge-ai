@@ -34,6 +34,7 @@ curl -i http://localhost:8000/health/ready
 | Format | `uv run ruff format .` |
 | Lint | `uv run ruff check .` |
 | Type check | `uv run mypy src tests` |
+| Architecture contracts | `uv run lint-imports` |
 | Unit tests | `uv run pytest` |
 | Add a dependency | `uv add <pkg>` (dev: `uv add --dev <pkg>`) |
 
@@ -75,6 +76,7 @@ src/enterprise_knowledge/
   config.py       typed settings
 tests/
   unit/           fast tests, no external services
+  architecture/   import-linter contracts run as a test
 docs/
   adr/            architecture decision records
 ```
@@ -100,6 +102,7 @@ More packages (`domain`, `ingestion`, `retrieval`, `generation`, `agents`, `eval
 
 - [Implementation plan](docs/implementation-plan.md)
 - [ADR-0001: Foundation stack and repository structure](docs/adr/0001-foundation-stack.md)
+- [ADR-0002: Enforced layered (clean) architecture](docs/adr/0002-enforced-layered-architecture.md)
 
 ## Data
 
