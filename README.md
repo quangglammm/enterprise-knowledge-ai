@@ -39,6 +39,20 @@ curl -i http://localhost:8000/health/ready
 
 CI runs the same checks on every pull request (`.github/workflows/ci.yml`).
 
+## Working with Claude Code
+
+The repository ships its own Claude Code setup, loaded automatically when you run `claude` from the repo root:
+
+| Path | Purpose |
+| --- | --- |
+| `CLAUDE.md` | Project context, commands, architecture boundaries, git conventions |
+| `.claude/rules/` | Python, testing, domain, API and GenAI-safety rules, scoped to matching paths |
+| `.claude/skills/` | `/implement <ID>`, `/check`, `/review-code`, `/adr <title>`, `/commit` |
+| `.claude/hooks/` | Auto-format and lint edited Python files; block non-conventional or attributed commit messages |
+| `.claude/settings.json` | Shared permissions (deny `.env` reads and `uv.lock` edits, ask before `git push`) and hooks |
+
+Personal overrides go in `CLAUDE.local.md` and `.claude/settings.local.json` (both gitignored).
+
 ## Configuration
 
 All settings are environment variables prefixed with `EKA_`; see [`.env.example`](.env.example). Required values (currently `EKA_DATABASE_URL`) have no default, so the process fails at startup with a validation error naming the missing variable. Secrets are never committed: use `.env` locally and a secret manager when deployed.
