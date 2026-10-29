@@ -1,51 +1,30 @@
-"""Deterministic embedder for tests: hashed bag of words, L2-normalized.
+"""Test embedder: the dev hashing embedder plus a record of what it was asked to embed."""
 
-Texts sharing words get similar vectors, so retrieval tests are meaningful without a model.
-Dimension defaults to the production dimension (ADR-0004) so schemas stay identical.
-"""
-
-import hashlib
-import math
-import re
 from collections.abc import Sequence
 
 from enterprise_knowledge.domain.ports import Vector
-from enterprise_knowledge.domain.text import normalize_nfc
+from enterprise_knowledge.infrastructure.embeddings.hashing import (
+    DEFAULT_DIMENSION,
+    HashingEmbedder,
+)
 
-PRODUCTION_DIMENSION = 1024
-_TOKEN = re.compile(r"\w+", re.UNICODE)
+PRODUCTION_DIMENSION = DEFAULT_DIMENSION
 
 
-class HashEmbedder:
+class HashEmbedder(HashingEmbedder):
     def __init__(self, *, dimension: int = PRODUCTION_DIMENSION, model: str = "fake-hash") -> None:
-        self._dimension = dimension
-        self._model = model
+        super().__init__(dimension=dimension, model=model)
         self.calls = 0
-
-    @property
-    def model(self) -> str:
-        return self._model
-
-    @property
-    def dimension(self) -> int:
-        return self._dimension
+        self.document_inputs: list[str] = []
+        self.fail_with: Exception | None = None
 
     async def embed_documents(self, texts: Sequence[str]) -> list[Vector]:
         self.calls += 1
-        return [self._embed(t) for t in texts]
+        if self.fail_with is not None:
+            raise self.fail_with
+        self.document_inputs.extend(texts)
+        return await super().embed_documents(texts)
 
     async def embed_query(self, text: str) -> Vector:
         self.calls += 1
-        return self._embed(text)
-
-    def _embed(self, text: str) -> Vector:
-        tokens = _TOKEN.findall(normalize_nfc(text).casefold())
-        if not tokens:
-            raise ValueError("cannot embed text without word characters")
-        vector = [0.0] * self._dimension
-        for token in tokens:
-            digest = hashlib.blake2b(token.encode(), digest_size=8).digest()
-            index = int.from_bytes(digest[:4], "big") % self._dimension
-            vector[index] += 1.0 if digest[4] & 1 else -1.0
-        norm = math.sqrt(sum(v * v for v in vector)) or 1.0
-        return tuple(v / norm for v in vector)
+        return await super().embed_query(text)
