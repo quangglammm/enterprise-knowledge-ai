@@ -60,6 +60,16 @@ Retries:
   - No LLM model is defaulted: the ADR-0004 trial chooses it.
 - **Tests:** `httpx.MockTransport` with scripted responses. No test or CI run reaches the network.
 
+## Smoke test (2026-10-29)
+
+`scripts/smoke_fpt.py` against the live API with `Llama-3.3-70B-Instruct` and `Vietnamese_Embedding`: 4/4 probes passed, 5 paid calls.
+
+- **Chat replies:** OpenAI-shaped (`choices`, `model`, `usage` with `prompt_tokens` and `completion_tokens`), so token counts are real rather than the 0 fallback.
+- **`response_format: json_object`:** accepted, and the reply parsed as JSON. That was one tiny probe on one model, so `EKA_LLM_JSON_MODE` stays off until the model trial compares it over a prompt set.
+- **Embeddings:** 1024 dimensions, matching the column. On one pair, a Vietnamese passage scored cosine 0.467 against an English question about it and 0.253 against an unrelated sentence. That shows only that the output is not noise; retrieval quality is measured in Week 4.
+- **One cross-lingual grounded answer** through the real prompt and parser, with JSON mode off: `answered`, 1 valid citation, 366 input and 32 output tokens, about 2.1 s.
+- **Not exercised:** retries, error statuses, rate limits and `Retry-After`. Nothing failed.
+
 ## Consequences
 
 - Switching `EKA_EMBEDDING_PROVIDER` or `EKA_EMBEDDING_MODEL` makes previously indexed chunks invisible, because search filters by `embedding_model`. Documents must be re-uploaded or re-indexed; a re-index command is out of scope until JOB-01.
