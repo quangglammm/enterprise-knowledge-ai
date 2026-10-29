@@ -304,12 +304,22 @@ class PostgresDocumentStore:
                         sql.Literal(_MAX_SCAN_TUPLES)
                     )
                 )
-            else:
-                # Exact scan: correct under selective filters, slower at scale (ADR-0007).
-                await conn.execute("SET LOCAL enable_indexscan = off")
-            cur = await conn.cursor(row_factory=dict_row).execute(_SEARCH_SQL, params)
-            rows = await cur.fetchall()
+                rows = await _run_search(conn, params)
+                if len(rows) >= k:
+                    return [_evidence(row) for row in rows]
+                # The index scan can stop early (scan budget, graph shape) under a selective
+                # filter. Fewer than k rows must mean fewer accessible chunks exist, so
+                # confirm with an exact scan (ADR-0007).
+                logger.debug("hnsw returned fewer than k; exact rescan", extra={"k": k})
+            # Exact scan: correct under any filter, slower at scale (ADR-0007).
+            await conn.execute("SET LOCAL enable_indexscan = off")
+            rows = await _run_search(conn, params)
         return [_evidence(row) for row in rows]
+
+
+async def _run_search(conn: AsyncConnection[Any], params: dict[str, Any]) -> list[dict[str, Any]]:
+    cur = await conn.cursor(row_factory=dict_row).execute(_SEARCH_SQL, params)
+    return await cur.fetchall()
 
 
 async def _recompute_searchable(
