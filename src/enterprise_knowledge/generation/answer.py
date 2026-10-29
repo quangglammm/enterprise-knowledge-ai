@@ -8,6 +8,7 @@ is still invalid is a typed failure, never an abstention (ADR-0009).
 import asyncio
 import logging
 from collections.abc import Mapping, Sequence
+from typing import TypedDict
 
 from pydantic import BaseModel, ConfigDict
 
@@ -50,53 +51,57 @@ class AnswerResult(BaseModel):
     prompt_version: str
     model_id: str | None = None
     repaired: bool = False
+    # Summed over the model calls of this answer (the repair included); 0 without a call.
+    input_tokens: int = 0
+    output_tokens: int = 0
+    model_latency_ms: float = 0.0
 
 
-class AnswerQuestion:
+class GenerateAnswer:
+    """Evidence already chosen to a validated answer: prompt, model, parse, one repair.
+
+    Shared by AnswerQuestion and the offline model trial, so the trial measures exactly
+    the production path.
+    """
+
     def __init__(
         self,
         *,
-        search: SearchKnowledge,
         chat: ChatModel,
-        k: int = DEFAULT_K,
-        min_score: float | None = None,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
     ) -> None:
-        self._search = search
         self._chat = chat
-        self._k = k
-        self._min_score = min_score
         self._timeout = timeout_seconds
         self._max_output_tokens = max_output_tokens
 
-    async def __call__(self, principal: Principal, question: str) -> AnswerResult:
-        text = normalize_nfc(question).strip()
-        hits = await self._search(principal, text, k=self._k)
-        evidence = tuple(h for h in hits if self._min_score is None or h.score >= self._min_score)
+    async def __call__(self, question: str, evidence: Sequence[RetrievedEvidence]) -> AnswerResult:
+        """``question`` must already be NFC-normalized; ``evidence`` must not be empty."""
         if not evidence:
-            logger.info("answer abstained without generation", extra={"retrieved": len(hits)})
-            return AnswerResult(
-                response=AnswerResponse.abstain(reason=NO_EVIDENCE_REASON),
-                evidence=(),
-                prompt_version=PROMPT_VERSION,
-            )
-
+            raise ValueError("generation needs at least one evidence item")
+        evidence = tuple(evidence)
         labels = {evidence_label(i): item.chunk_id for i, item in enumerate(evidence)}
-        messages = answer_messages(text, evidence)
-        replies = [await self._complete(messages)]
+        messages = answer_messages(question, evidence)
+        # One deadline for the whole answer, the repair attempt included (ADR-0009).
         try:
-            response = parse_answer(replies[0].content, labels)
-        except (InvalidModelOutputError, UnresolvedCitationError) as exc:
-            retry = (
-                *messages,
-                ChatMessage(role="assistant", content=replies[0].content),
-                repair_message(str(exc), evidence_count=len(evidence)),
-            )
-            replies.append(await self._complete(retry))
-            response = self._parse_final(replies, labels)
+            async with asyncio.timeout(self._timeout):
+                replies = [await self._complete(messages)]
+                try:
+                    response = parse_answer(replies[0].content, labels)
+                except (InvalidModelOutputError, UnresolvedCitationError) as exc:
+                    retry = (
+                        *messages,
+                        ChatMessage(role="assistant", content=replies[0].content),
+                        repair_message(str(exc), evidence_count=len(evidence)),
+                    )
+                    replies.append(await self._complete(retry))
+                    response = self._parse_final(replies, labels)
+        except TimeoutError as exc:
+            logger.warning("model call timed out", extra={"timeout_seconds": self._timeout})
+            raise ModelTimeoutError(f"model did not answer within {self._timeout}s") from exc
         response.verify_citations(evidence)  # defense in depth: labels already resolved
 
+        usage = _usage(replies)
         logger.info(
             "answer generated",
             extra={
@@ -104,7 +109,7 @@ class AnswerQuestion:
                 "evidence": len(evidence),
                 "citations": len(response.citations),
                 "repaired": len(replies) > 1,
-                **_usage(replies),
+                **usage,
             },
         )
         return AnswerResult(
@@ -113,6 +118,9 @@ class AnswerQuestion:
             prompt_version=PROMPT_VERSION,
             model_id=replies[-1].model_id,
             repaired=len(replies) > 1,
+            input_tokens=usage["input_tokens"],
+            output_tokens=usage["output_tokens"],
+            model_latency_ms=usage["latency_ms"],
         )
 
     async def _complete(self, messages: Sequence[ChatMessage]) -> ChatResponse:
@@ -122,12 +130,7 @@ class AnswerQuestion:
             temperature=0.0,
             json_mode=True,
         )
-        try:
-            async with asyncio.timeout(self._timeout):
-                return await self._chat.complete(request)
-        except TimeoutError as exc:
-            logger.warning("model call timed out", extra={"timeout_seconds": self._timeout})
-            raise ModelTimeoutError(f"model did not answer within {self._timeout}s") from exc
+        return await self._chat.complete(request)
 
     @staticmethod
     def _parse_final(replies: list[ChatResponse], labels: Mapping[str, ChunkId]) -> AnswerResponse:
@@ -141,7 +144,49 @@ class AnswerQuestion:
             raise
 
 
-def _usage(replies: Sequence[ChatResponse]) -> dict[str, object]:
+class AnswerQuestion:
+    """Retrieve access-checked evidence, then generate; abstain when none is usable."""
+
+    def __init__(
+        self,
+        *,
+        search: SearchKnowledge,
+        chat: ChatModel,
+        k: int = DEFAULT_K,
+        min_score: float | None = None,
+        timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+        max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
+    ) -> None:
+        self._search = search
+        self._k = k
+        self._min_score = min_score
+        self._generate = GenerateAnswer(
+            chat=chat, timeout_seconds=timeout_seconds, max_output_tokens=max_output_tokens
+        )
+
+    async def __call__(self, principal: Principal, question: str) -> AnswerResult:
+        text = normalize_nfc(question).strip()
+        hits = await self._search(principal, text, k=self._k)
+        evidence = tuple(h for h in hits if self._min_score is None or h.score >= self._min_score)
+        if not evidence:
+            logger.info("answer abstained without generation", extra={"retrieved": len(hits)})
+            return AnswerResult(
+                response=AnswerResponse.abstain(reason=NO_EVIDENCE_REASON),
+                evidence=(),
+                prompt_version=PROMPT_VERSION,
+            )
+        return await self._generate(text, evidence)
+
+
+class _Usage(TypedDict):
+    model_id: str
+    input_tokens: int
+    output_tokens: int
+    latency_ms: float
+    prompt_version: str
+
+
+def _usage(replies: Sequence[ChatResponse]) -> _Usage:
     """Model ID, tokens and latency summed over the calls of one answer. Never content."""
     return {
         "model_id": replies[-1].model_id,

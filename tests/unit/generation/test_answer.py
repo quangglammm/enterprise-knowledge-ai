@@ -8,7 +8,7 @@ import pytest
 
 from enterprise_knowledge.domain.access import AccessPolicy
 from enterprise_knowledge.domain.answers import AnswerStatus
-from enterprise_knowledge.generation.answer import AnswerQuestion
+from enterprise_knowledge.generation.answer import AnswerQuestion, GenerateAnswer
 from enterprise_knowledge.generation.errors import (
     InvalidModelOutputError,
     ModelTimeoutError,
@@ -17,7 +17,7 @@ from enterprise_knowledge.generation.errors import (
 from enterprise_knowledge.generation.prompts import PROMPT_VERSION, SYSTEM_PROMPT
 from enterprise_knowledge.ingestion.ingest import IngestDocument
 from enterprise_knowledge.retrieval.search import SearchKnowledge
-from tests.factories import TENANT, make_policy, make_principal
+from tests.factories import TENANT, make_evidence, make_policy, make_principal
 from tests.fakes.blob_store import InMemoryBlobStore
 from tests.fakes.chat_model import ScriptedChatModel
 from tests.fakes.document_store import InMemoryDocumentStore
@@ -203,3 +203,25 @@ async def test_logs_carry_usage_but_no_text(caplog: pytest.LogCaptureFixture) ->
     logged = " ".join(f"{r.getMessage()} {r.__dict__}" for r in caplog.records)
     for text in (QUESTION, "twelve days of annual leave", "Twelve days of leave"):
         assert text not in logged
+
+
+async def test_generate_answer_works_on_given_evidence_and_reports_usage() -> None:
+    chat = ScriptedChatModel(["not json", answered("E2", text="Twelve days [E2].")])
+    generate = GenerateAnswer(chat=chat)
+    evidence = [make_evidence("c1", text="Printers"), make_evidence("c2", text="12 days")]
+
+    result = await generate(QUESTION, evidence)
+
+    assert [c.chunk_id for c in result.response.citations] == ["c2"]
+    assert result.repaired
+    assert (
+        result.input_tokens
+        == sum(len(m.content) for m in chat.requests[0].messages) // 4
+        + sum(len(m.content) for m in chat.requests[1].messages) // 4
+    )
+    assert result.output_tokens > 0
+
+
+async def test_generate_answer_requires_evidence() -> None:
+    with pytest.raises(ValueError, match="evidence"):
+        await GenerateAnswer(chat=ScriptedChatModel([]))(QUESTION, [])
