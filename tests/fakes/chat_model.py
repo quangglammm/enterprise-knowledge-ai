@@ -1,9 +1,11 @@
 """Chat model that replays scripted outputs and records requests.
 
 Script entries are either response text or an exception to raise, so tests can simulate
-throttling, timeouts and invalid JSON without a real provider.
+throttling, timeouts and invalid JSON without a real provider. ``delay_seconds`` makes
+every call slow, to exercise caller-side timeouts.
 """
 
+import asyncio
 from collections import deque
 from collections.abc import Iterable
 
@@ -15,6 +17,7 @@ class ScriptedChatModel:
         self._script: deque[str | Exception] = deque(script)
         self._model_id = model_id
         self.requests: list[ChatRequest] = []
+        self.delay_seconds = 0.0
 
     @property
     def model_id(self) -> str:
@@ -22,6 +25,8 @@ class ScriptedChatModel:
 
     async def complete(self, request: ChatRequest) -> ChatResponse:
         self.requests.append(request)
+        if self.delay_seconds:
+            await asyncio.sleep(self.delay_seconds)
         if not self._script:
             raise AssertionError("ScriptedChatModel: no scripted response left")
         step = self._script.popleft()

@@ -16,7 +16,7 @@ from enterprise_knowledge.api import health
 from enterprise_knowledge.api.errors import install_error_handlers
 from enterprise_knowledge.api.health import ReadinessCheck
 from enterprise_knowledge.api.middleware import RequestContextMiddleware
-from enterprise_knowledge.api.routes import documents
+from enterprise_knowledge.api.routes import answers, documents
 from enterprise_knowledge.api.services import Services
 from enterprise_knowledge.config import Settings, get_settings
 from enterprise_knowledge.infrastructure.blobs import LocalBlobStore
@@ -50,6 +50,7 @@ def create_app(
     install_error_handlers(app)
     app.include_router(health.router)
     app.include_router(documents.router)
+    app.include_router(answers.router)
     return app
 
 

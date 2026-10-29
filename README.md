@@ -74,6 +74,7 @@ All settings are environment variables prefixed with `EKA_`; see [`.env.example`
 | `GET /v1/documents/{id}/chunks` | Chunks of the current (or `?version=`) version, with page, section and character offsets. Superseded versions have no chunks (ADR-0008). |
 | `DELETE /v1/documents/{id}` | Remove every version from search and storage. `204`, also when already deleted. |
 | `POST /v1/search` | `{"query": "...", "k": 5}` returns access-checked evidence. |
+| `POST /v1/answers` | `{"question": "..."}` returns an answer with validated citations, or `status: insufficient_evidence`. Model failures are `502`/`504`. Returns `503` until a chat model adapter is configured (next: FPT adapter, ADR-0004). |
 
 Interactive docs are at `/docs` when the API runs.
 
@@ -100,8 +101,9 @@ Every response carries an `X-Request-ID` header. A caller-supplied ID is reused 
 ```
 src/enterprise_knowledge/
   domain/         models, access policy, job state machine, ports (no SDK imports)
-  ingestion/      format detection, parsing, normalization, chunking, IngestDocument use case
+  ingestion/      format detection, parsing, normalization, chunking, IngestDocument and DeleteDocument use cases
   retrieval/      SearchKnowledge use case
+  generation/     AnswerQuestion use case, versioned prompt, answer parsing and citation checks
   infrastructure/ adapters: Postgres store and vector search, migrations, blob store, dev embedder
   api/            HTTP layer only (routes, middleware, app factory)
   observability/  structured logging, later tracing and metrics
@@ -119,7 +121,7 @@ docs/
   adr/            architecture decision records
 ```
 
-More packages (`generation`, `agents`, `evaluation`, `worker`) are added when their first feature lands, rather than as empty folders.
+More packages (`agents`, `evaluation`, `worker`) are added when their first feature lands, rather than as empty folders.
 
 ## Roadmap
 
@@ -147,6 +149,7 @@ More packages (`generation`, `agents`, `evaluation`, `worker`) are added when th
 - [ADR-0006: Document parsing and chunking](docs/adr/0006-document-parsing-and-chunking.md)
 - [ADR-0007: Postgres persistence and vector search](docs/adr/0007-postgres-persistence.md)
 - [ADR-0008: Document lifecycle: superseded versions and deletion](docs/adr/0008-document-lifecycle.md)
+- [ADR-0009: Grounded answer generation and citation validation](docs/adr/0009-grounded-answer-generation.md)
 
 ## Data
 

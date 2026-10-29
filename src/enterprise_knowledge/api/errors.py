@@ -18,6 +18,7 @@ from enterprise_knowledge.domain.errors import (
     DocumentNotFoundError,
     DomainError,
 )
+from enterprise_knowledge.generation.errors import GenerationError, ModelTimeoutError
 from enterprise_knowledge.ingestion.errors import (
     DocumentTooLargeError,
     IngestionError,
@@ -59,6 +60,9 @@ _DOMAIN_STATUS: list[tuple[type[DomainError], int]] = [
     (DocumentNotFoundError, status.HTTP_404_NOT_FOUND),
     # Two uploads raced to create the same version; the client may retry.
     (DocumentAlreadyExistsError, status.HTTP_409_CONFLICT),
+    # The model, not the request, failed (ADR-0009). Never reported as an abstention.
+    (ModelTimeoutError, status.HTTP_504_GATEWAY_TIMEOUT),
+    (GenerationError, status.HTTP_502_BAD_GATEWAY),
 ]
 
 
