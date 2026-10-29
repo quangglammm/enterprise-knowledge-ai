@@ -30,7 +30,11 @@
     ],
     "deny": [
       "Read(./.env)",
-      "Read(./.env.*)",
+      "Read(./.env.local)",
+      "Read(./.env.*.local)",
+      "Read(./.env.production)",
+      "Read(./.env.development)",
+      "Read(./.env.staging)",
       "Edit(./.env)",
       "Edit(./uv.lock)",
       "Write(./uv.lock)",
