@@ -37,6 +37,12 @@ class Settings(BaseSettings):
         description="PostgreSQL DSN, e.g. postgresql://user:pass@localhost:5432/eka",
     )
 
+    database_pool_min_size: int = Field(default=1, ge=0)
+    database_pool_max_size: int = Field(default=10, ge=1)
+
+    # Must match the vector column created by migrations (ADR-0004); checked at startup.
+    embedding_dimension: int = Field(default=1024, ge=1)
+
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_json: bool = True
 

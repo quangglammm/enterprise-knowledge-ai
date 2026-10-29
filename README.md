@@ -19,13 +19,14 @@ cp .env.example .env
 
 uv sync                       # installs exact versions from uv.lock
 docker compose up -d postgres # local Postgres + pgvector
+uv run eka-migrate            # apply database migrations
 uv run eka-api                # http://127.0.0.1:8000/docs
 ```
 
 Or run everything in containers:
 
 ```bash
-docker compose up --build
+docker compose up --build      # postgres, then migrations, then the API
 curl -i http://localhost:8000/health/ready
 ```
 
@@ -38,6 +39,8 @@ curl -i http://localhost:8000/health/ready
 | Type check | `uv run mypy src tests` |
 | Architecture contracts | `uv run lint-imports` |
 | Unit tests | `uv run pytest` |
+| Integration tests | `docker compose up -d postgres` then `EKA_TEST_DATABASE_URL=postgresql://eka:eka@localhost:5432/eka_test uv run pytest -m integration` |
+| Apply migrations | `uv run eka-migrate` |
 | Add a dependency | `uv add <pkg>` (dev: `uv add --dev <pkg>`) |
 
 CI runs the same checks on every pull request (`.github/workflows/ci.yml`).
@@ -65,7 +68,7 @@ All settings are environment variables prefixed with `EKA_`; see [`.env.example`
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /health/live` | Process is running. Never checks dependencies. |
-| `GET /health/ready` | Instance can serve traffic. Runs dependency checks; `503` if any fail. |
+| `GET /health/ready` | Instance can serve traffic. Checks the database; `503` if any check fails. |
 
 Every response carries an `X-Request-ID` header. A caller-supplied ID is reused if it is safe (`[A-Za-z0-9._-]{1,64}`); otherwise a new one is generated. The same ID appears on every log line for that request.
 
@@ -75,12 +78,14 @@ Every response carries an `X-Request-ID` header. A caller-supplied ID is reused 
 src/enterprise_knowledge/
   domain/         models, access policy, job state machine, ports (no SDK imports)
   ingestion/      format detection, PDF/DOCX/HTML/Markdown parsing, normalization, chunking
+  infrastructure/ adapters: Postgres document store and vector search, SQL migrations
   api/            HTTP layer only (routes, middleware, app factory)
   observability/  structured logging, later tracing and metrics
   config.py       typed settings
 tests/
   unit/           fast tests, no external services
-  contract/       behavior every port implementation must have (fakes now, Postgres later)
+  contract/       behavior every port implementation must have (fake and Postgres)
+  integration/    Postgres-specific tests (marked `integration`, need a database)
   fakes/          in-memory implementations of the ports
   architecture/   import-linter contracts run as a test
 datasets/
@@ -116,6 +121,7 @@ More packages (`retrieval`, `generation`, `agents`, `evaluation`, `worker`) are 
 - [ADR-0004: Model and embedding providers](docs/adr/0004-model-and-embedding-providers.md)
 - [ADR-0005: Bilingual demo corpus](docs/adr/0005-bilingual-demo-corpus.md)
 - [ADR-0006: Document parsing and chunking](docs/adr/0006-document-parsing-and-chunking.md)
+- [ADR-0007: Postgres persistence and vector search](docs/adr/0007-postgres-persistence.md)
 
 ## Data
 

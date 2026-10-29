@@ -8,7 +8,7 @@ from enterprise_knowledge.config import get_settings
 def main() -> None:
     settings = get_settings()
     uvicorn.run(
-        "enterprise_knowledge.api.app:create_app",
+        "enterprise_knowledge.api.app:create_production_app",
         factory=True,
         host=settings.api_host,
         port=settings.api_port,

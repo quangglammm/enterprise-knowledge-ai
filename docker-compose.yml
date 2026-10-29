@@ -9,11 +9,22 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/10-test-database.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U eka -d eka"]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  migrate:
+    build: .
+    command: ["eka-migrate"]
+    environment:
+      EKA_DATABASE_URL: postgresql://eka:eka@postgres:5432/eka
+      EKA_LOG_JSON: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   api:
     build: .
@@ -24,8 +35,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   pgdata:
