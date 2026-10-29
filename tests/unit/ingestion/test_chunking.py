@@ -71,14 +71,24 @@ def test_chunking_is_deterministic(name: str, content_type: ContentType) -> None
 
 
 @pytest.mark.parametrize(("name", "content_type"), ALL_FIXTURES)
-def test_every_block_is_covered_by_some_chunk(name: str, content_type: ContentType) -> None:
+def test_every_body_block_is_covered_and_every_heading_survives(
+    name: str, content_type: ContentType
+) -> None:
     parsed = parsed_fixture(name, content_type)
-    _, drafts = chunk_document(parsed, SMALL)
+    text, drafts = chunk_document(parsed, SMALL)
+    covered = [False] * len(text)
+    for draft in drafts:
+        covered[draft.char_start : draft.char_end] = [True] * (draft.char_end - draft.char_start)
 
+    offset = 0
     for block in parsed.blocks:
-        assert any(block.text in d.text for d in drafts) or block.text in " ".join(
-            d.text for d in drafts
-        )
+        start = text.index(block.text, offset)
+        offset = start + len(block.text)
+        if block.kind is BlockKind.HEADING:
+            # A heading appears in a chunk's text, or at least as some chunk's section.
+            assert all(covered[start:offset]) or any(d.section == block.text for d in drafts)
+        else:
+            assert all(covered[start:offset]), block.text
 
 
 # --- structure -----------------------------------------------------------------------
@@ -94,15 +104,21 @@ def test_headings_start_new_chunks_and_set_section() -> None:
     assert [d.section for d in drafts] == headings
 
 
-def test_chunks_never_contain_a_later_heading() -> None:
-    parsed = parsed_fixture("vpn-runbook-en.docx", ContentType.DOCX)
-    headings = [b.text for b in parsed.blocks if b.kind is BlockKind.HEADING]
+@pytest.mark.parametrize(("name", "content_type"), ALL_FIXTURES)
+def test_chunks_never_span_two_sections(name: str, content_type: ContentType) -> None:
+    """Headings may only lead a chunk; once body text starts, no heading may follow."""
+    parsed = parsed_fixture(name, content_type)
+    headings = {b.text for b in parsed.blocks if b.kind is BlockKind.HEADING}
 
     _, drafts = chunk_document(parsed, SMALL)
 
     for draft in drafts:
-        body = draft.text.removeprefix(draft.section or "")
-        assert not any(f"\n\n{h}" in body for h in headings)
+        seen_body = False
+        for part in draft.text.split("\n\n"):
+            if part in headings:
+                assert not seen_body, draft.text
+            else:
+                seen_body = True
 
 
 def test_page_is_the_page_where_the_chunk_starts() -> None:
@@ -208,3 +224,32 @@ def test_build_chunks_rejects_non_contiguous_indexes() -> None:
 
     with pytest.raises(ValueError, match="index"):
         build_chunks(make_document(), [draft])
+
+
+def test_consecutive_headings_merge_into_the_following_chunk() -> None:
+    parsed = doc(
+        (BlockKind.HEADING, "VPN access runbook", "VPN access runbook"),
+        (BlockKind.HEADING, "Purpose", "Purpose"),
+        (BlockKind.PARAGRAPH, "This runbook explains the VPN.", "Purpose"),
+        (BlockKind.HEADING, "Steps", "Steps"),
+        (BlockKind.PARAGRAPH, "Open the client.", "Steps"),
+    )
+
+    _, drafts = chunk_document(parsed, ChunkingSettings())
+
+    assert [d.text for d in drafts] == [
+        "VPN access runbook\n\nPurpose\n\nThis runbook explains the VPN.",
+        "Steps\n\nOpen the client.",
+    ]
+    assert [d.section for d in drafts] == ["Purpose", "Steps"]
+
+
+@pytest.mark.parametrize(("name", "content_type"), ALL_FIXTURES)
+def test_no_chunk_is_only_headings(name: str, content_type: ContentType) -> None:
+    parsed = parsed_fixture(name, content_type)
+    headings = {b.text for b in parsed.blocks if b.kind is BlockKind.HEADING}
+
+    _, drafts = chunk_document(parsed, SMALL)
+
+    for draft in drafts:
+        assert not set(draft.text.split("\n\n")) <= headings, draft.text

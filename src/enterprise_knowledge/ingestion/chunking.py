@@ -5,6 +5,9 @@ Blocks are split into sentence units, and units are packed into chunks that:
 
 - never exceed ``max_chars``,
 - start at every heading, so a chunk never spans two sections,
+- never consist of headings alone: consecutive headings merge into the following chunk, and a
+  heading whose body cannot fit beside it is dropped from the text (it remains the chunk's
+  ``section`` and part of the embedding header),
 - repeat up to ``overlap_chars`` of trailing units from the previous chunk of the same section,
 - are exact slices of the normalized text, so ``char_start``/``char_end`` locate citations.
 """
@@ -65,6 +68,7 @@ class _Unit:
     page: int | None
     section: str | None
     starts_section: bool
+    heading: bool
 
 
 def chunk_document(
@@ -85,7 +89,7 @@ def chunk_document(
                 char_start=start,
                 char_end=end,
                 page=group[0].page,
-                section=group[0].section,
+                section=group[-1].section,
                 language=detect_language(chunk_text),
             )
         )
@@ -130,6 +134,7 @@ def _units(parsed: ParsedDocument, max_chars: int) -> tuple[str, list[_Unit]]:
                     page=block.page,
                     section=block.section,
                     starts_section=heading and i == 0,
+                    heading=heading,
                 )
             )
         parts.append(block.text)
@@ -167,11 +172,22 @@ def _pack(units: list[_Unit], settings: ChunkingSettings) -> list[list[_Unit]]:
     groups: list[list[_Unit]] = []
     current: list[_Unit] = []
     for unit in units:
-        if current and (unit.starts_section or unit.end - current[0].start > settings.max_chars):
-            groups.append(current)
-            current = [] if unit.starts_section else _overlap(current, unit, settings)
+        if current:
+            headings_only = all(u.heading for u in current)
+            too_long = unit.end - current[0].start > settings.max_chars
+            if unit.starts_section and headings_only and not too_long:
+                current.append(unit)  # consecutive headings travel with the next body
+                continue
+            if unit.starts_section or too_long:
+                if not headings_only:
+                    groups.append(current)
+                current = (
+                    []
+                    if unit.starts_section or headings_only
+                    else _overlap(current, unit, settings)
+                )
         current.append(unit)
-    if current:
+    if current and (not all(u.heading for u in current) or not groups):
         groups.append(current)
     return groups
 
