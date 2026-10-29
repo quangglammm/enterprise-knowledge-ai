@@ -34,9 +34,12 @@ services:
       EKA_LOG_JSON: "true"
     ports:
       - "8000:8000"
+    volumes:
+      - blobs:/app/data/blobs
     depends_on:
       migrate:
         condition: service_completed_successfully
 
 volumes:
   pgdata:
+  blobs:

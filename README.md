@@ -6,7 +6,7 @@ A document-grounded knowledge assistant. It ingests enterprise documents asynchr
 
 **Corpus:** bilingual Vietnamese and English documents from a fictional company, with tenants, access groups and document versions.
 
-> Status: **v0.1 in progress (Week 1, foundation).** Only the API skeleton and health endpoints exist so far. See [the roadmap](#roadmap) and the full [implementation plan](docs/implementation-plan.md).
+> Status: **v0.1 (Week 1, foundation).** Documents can be uploaded, parsed, chunked, indexed in Postgres and searched with access control. Embeddings come from a development-only hashing embedder until the FPT adapter lands in Week 3, so search is lexical, not semantic; there is no answer generation yet. See [the roadmap](#roadmap) and the full [implementation plan](docs/implementation-plan.md).
 
 ## Quick start
 
@@ -69,16 +69,39 @@ All settings are environment variables prefixed with `EKA_`; see [`.env.example`
 | --- | --- |
 | `GET /health/live` | Process is running. Never checks dependencies. |
 | `GET /health/ready` | Instance can serve traffic. Checks the database; `503` if any check fails. |
+| `POST /v1/documents` | Upload a file (`multipart/form-data`: `file`, `allowed_groups`, optional `title`, optional `document_id` for a new version). `201` when indexed, `200` when identical content is already indexed. |
+| `GET /v1/documents/{id}` | Current version's metadata and status. |
+| `GET /v1/documents/{id}/chunks` | Chunks of the current (or `?version=`) version, with page, section and character offsets. |
+| `POST /v1/search` | `{"query": "...", "k": 5}` returns access-checked evidence. |
 
-Every response carries an `X-Request-ID` header. A caller-supplied ID is reused if it is safe (`[A-Za-z0-9._-]{1,64}`); otherwise a new one is generated. The same ID appears on every log line for that request.
+Interactive docs are at `/docs` when the API runs.
+
+**Identity (development only).** Requests identify the caller with `X-Tenant-ID`, `X-User-ID` and `X-User-Groups` (comma-separated). Anyone can claim any identity this way, so the settings refuse it outside local and test environments; real authentication is SEC-01. Uploaders may only share with groups they belong to, and documents a caller cannot read return `404`, the same as missing ones.
+
+```bash
+H='-H X-Tenant-ID:bamboo-harbor -H X-User-ID:an -H X-User-Groups:all-staff'
+curl -s $H -F file=@datasets/fixtures/leave-policy-vi.pdf -F allowed_groups=all-staff \
+  http://localhost:8000/v1/documents
+curl -s $H -H 'Content-Type: application/json' \
+  -d '{"query": "số ngày nghỉ phép năm", "k": 3}' http://localhost:8000/v1/search
+```
+
+**Errors** always have the same shape, with a stable category and the request ID that also appears in the logs:
+
+```json
+{"error": {"category": "corrupt_document", "message": "PDF could not be read", "request_id": "..."}}
+```
+
+Every response carries an `X-Request-ID` header. A caller-supplied ID is reused if it is safe (`[A-Za-z0-9._-]{1,64}`); otherwise a new one is generated.
 
 ## Repository layout
 
 ```
 src/enterprise_knowledge/
   domain/         models, access policy, job state machine, ports (no SDK imports)
-  ingestion/      format detection, PDF/DOCX/HTML/Markdown parsing, normalization, chunking
-  infrastructure/ adapters: Postgres document store and vector search, SQL migrations
+  ingestion/      format detection, parsing, normalization, chunking, IngestDocument use case
+  retrieval/      SearchKnowledge use case
+  infrastructure/ adapters: Postgres store and vector search, migrations, blob store, dev embedder
   api/            HTTP layer only (routes, middleware, app factory)
   observability/  structured logging, later tracing and metrics
   config.py       typed settings
@@ -95,7 +118,7 @@ docs/
   adr/            architecture decision records
 ```
 
-More packages (`retrieval`, `generation`, `agents`, `evaluation`, `worker`) are added when their first feature lands, rather than as empty folders.
+More packages (`generation`, `agents`, `evaluation`, `worker`) are added when their first feature lands, rather than as empty folders.
 
 ## Roadmap
 

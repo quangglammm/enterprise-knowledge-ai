@@ -20,12 +20,15 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # ---- runtime: only the venv, non-root user ----
 FROM python:3.12-slim AS runtime
-RUN groupadd --system app && useradd --system --gid app --no-create-home app
+RUN groupadd --system app && useradd --system --gid app --no-create-home app \
+    && mkdir -p /app/data/blobs && chown -R app:app /app/data
+WORKDIR /app
 COPY --from=build --chown=app:app /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     EKA_API_HOST=0.0.0.0 \
-    EKA_API_PORT=8000
+    EKA_API_PORT=8000 \
+    EKA_BLOB_DIR=/app/data/blobs
 USER app
 EXPOSE 8000
 

@@ -13,11 +13,19 @@ from fastapi import FastAPI
 
 from enterprise_knowledge import __version__
 from enterprise_knowledge.api import health
+from enterprise_knowledge.api.errors import install_error_handlers
 from enterprise_knowledge.api.health import ReadinessCheck
 from enterprise_knowledge.api.middleware import RequestContextMiddleware
+from enterprise_knowledge.api.routes import documents
+from enterprise_knowledge.api.services import Services
 from enterprise_knowledge.config import Settings, get_settings
+from enterprise_knowledge.infrastructure.blobs import LocalBlobStore
+from enterprise_knowledge.infrastructure.embeddings.hashing import HashingEmbedder
 from enterprise_knowledge.infrastructure.postgres.store import PostgresDocumentStore
+from enterprise_knowledge.ingestion.ingest import IngestDocument
+from enterprise_knowledge.ingestion.limits import IngestionLimits
 from enterprise_knowledge.observability.logging import configure_logging
+from enterprise_knowledge.retrieval.search import SearchKnowledge
 
 Lifespan = Callable[[FastAPI], AbstractAsyncContextManager[None]]
 
@@ -26,6 +34,7 @@ def create_app(
     settings: Settings | None = None,
     readiness_checks: dict[str, ReadinessCheck] | None = None,
     lifespan: Lifespan | None = None,
+    services: Services | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level, json_output=settings.log_json)
@@ -34,9 +43,12 @@ def create_app(
     app.state.settings = settings
     app.state.logger = logging.getLogger("enterprise_knowledge.api")
     app.state.readiness_checks = dict(readiness_checks or {})
+    app.state.services = services
 
     app.add_middleware(RequestContextMiddleware)
+    install_error_handlers(app)
     app.include_router(health.router)
+    app.include_router(documents.router)
     return app
 
 
@@ -52,11 +64,27 @@ def create_production_app(settings: Settings | None = None) -> FastAPI:
             min_size=settings.database_pool_min_size,
             max_size=settings.database_pool_max_size,
         )
-        app.state.document_store = store
         app.state.readiness_checks["database"] = store.ping
+        app.state.services = build_services(settings, store)
         try:
             yield
         finally:
             await store.close()
 
     return create_app(settings, lifespan=lifespan)
+
+
+def build_services(settings: Settings, store: PostgresDocumentStore) -> Services:
+    """Wire use cases to adapters. The hashing embedder is dev-only (settings enforce it)."""
+    embedder = HashingEmbedder(dimension=settings.embedding_dimension)
+    return Services(
+        documents=store,
+        ingest=IngestDocument(
+            documents=store,
+            embedder=embedder,
+            blobs=LocalBlobStore(settings.blob_dir),
+            limits=IngestionLimits(max_bytes=settings.max_upload_bytes),
+        ),
+        search=SearchKnowledge(search=store, embedder=embedder),
+        max_upload_bytes=settings.max_upload_bytes,
+    )
