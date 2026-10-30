@@ -32,6 +32,23 @@ Week 6 comparison (AGENT-01, ADR-0017). Both runs use benchmark v2 (115 question
 
 `EKA_ANSWER_MODE` stays `direct`. On benchmark v2, `planner-v1` doubles the model calls for 0 improved and 1 worsened question, so by the safety rule's own test ("the agent path must justify itself in the evaluation") it is not justified as a default. The mode stays available in the API and the UI for comparison.
 
+## With verification (AGENT-02, ADR-0019)
+
+Rerun of the workflow with claim-level verification: report `answer-quality-v2-workflow-20261030-100934.json`, code `0173209`, verifier `verifier-v1`.
+
+| Metric | Workflow | Workflow + verification |
+| --- | --- | --- |
+| Outcomes changed (status, correctness, gold) | — | 0 of 115 |
+| Answers verified / revised / withheld | — | 95 / 0 / 0 |
+| Answer-side model calls | 230 | 325 (+41%) |
+| Verifier tokens (in / out) | 0 | 69,271 / 4,727 (about 730 in per call) |
+
+- **No correct answer was withheld.** The verifier passed all 95 answers that made claims, so its false-withholding rate on real answers is 0 of 95. The other 20 were the model's own abstentions, with nothing to verify.
+- **Its catch rate is not measured here.** This benchmark has no unsupported claims to catch: the EVAL-02 judge already found every answer faithful. That the verifier catches unsupported claims rests on its calibration: 12 of 12 hand-labelled grounding cases, 5 of them unsupported, including one where the evidence instructs the checker.
+- **It does not catch q025.** q025 (GOV.UK's 28 days) still passes: the answer is faithful to the wrong evidence, which claim checking cannot see.
+
+So on benchmark v2, verification costs about 95 calls per 115 questions and changes nothing. Its value is as a guard against hallucination and injection on inputs this benchmark does not contain.
+
 ## Next
 
 - **A `planner-v2` aimed at the measured failure:** for each sub-question, also emit a query in the other language (Vietnamese ↔ English). Four of the eight direct misses are cross-lingual retrieval failures, and this is the one change in the workflow's power that targets them. It is a hypothesis to test, ideally on a development/test split of the questions, so the prompt is not tuned to the same 100 questions it is scored on.

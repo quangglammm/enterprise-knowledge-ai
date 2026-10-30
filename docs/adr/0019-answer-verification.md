@@ -49,6 +49,14 @@ On the 12 hand-labelled grounding cases of `datasets/judge_calibration/cases-v2.
 - **Fix:** `clean_json_reply` now drops trailing text.
 - **Rerun** (`verifier-calibration-20261030-090729.json`): 12/12 agreement and 0 errors, including the case where the evidence instructs the checker.
 
+## Results on benchmark v2 (2026-10-30)
+
+Workflow with verification, code `0173209`: `docs/evaluation/agent01-direct-vs-workflow.md`.
+
+- **No false withholding:** 95 answers verified, 0 revised, 0 withheld, and outcomes identical to the unverified workflow on all 115 questions.
+- **Cost:** 95 extra model calls (325 against 230) and 69k verifier input tokens.
+- **Catch rate:** not measurable on this benchmark, which has no unsupported claims. It rests on the calibration (5 unsupported cases among the 12, all caught).
+
 ## Consequences
 
 - **Cost:** a verified workflow answer costs one more model call (two more, plus the regeneration, when it is revised). Direct mode is unchanged.
