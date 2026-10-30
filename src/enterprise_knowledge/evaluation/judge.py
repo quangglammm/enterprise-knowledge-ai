@@ -27,7 +27,7 @@ from enterprise_knowledge.domain.ports import ChatModel
 from enterprise_knowledge.domain.retrieval import RetrievedEvidence
 from enterprise_knowledge.generation.prompts import escape_markup, evidence_block, evidence_label
 
-JUDGE_PROMPT_VERSION = "judge-v1"
+JUDGE_PROMPT_VERSION = "judge-v2"
 DEFAULT_TIMEOUT_SECONDS = 60.0
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
 _FENCE = re.compile(r"^```(?:json)?\s*(?P<body>.*?)\s*```$", re.DOTALL | re.IGNORECASE)
@@ -37,7 +37,9 @@ You grade an answer to an employee's question against a reference answer.
 
 Rules:
 1. Compare facts only. Wording, language (Vietnamese or English) and extra detail that \
-does not contradict the reference do not matter.
+does not contradict the reference do not matter. Read the answer as a reply to its \
+question: details the question already states (a period such as "per day", a place, \
+"minimum" or "maximum") need not be repeated.
 2. "correct": every fact in the reference is in the answer and none is contradicted. \
 "partially_correct": some reference facts are present, others are missing, and nothing \
 contradicts the reference. "incorrect": a fact contradicts the reference, or no \

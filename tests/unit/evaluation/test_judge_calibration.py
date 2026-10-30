@@ -78,7 +78,7 @@ async def test_agreement_is_measured_per_metric() -> None:
     assert (first.expected, first.judged) == ("correct", Correctness.PARTIALLY_CORRECT.value)
     assert second.agrees
     assert report.judge_model == "fake-chat"
-    assert report.judge_prompt_version == "judge-v1"
+    assert report.judge_prompt_version == "judge-v2"
 
 
 async def test_judge_failures_are_counted_not_hidden() -> None:
@@ -93,7 +93,7 @@ async def test_judge_failures_are_counted_not_hidden() -> None:
 
 
 def test_bundled_calibration_set_covers_every_verdict() -> None:
-    cases = load_calibration(REPO / "datasets" / "judge_calibration" / "cases-v1.jsonl")
+    cases = load_calibration(REPO / "datasets" / "judge_calibration" / "cases-v2.jsonl")
 
     correctness = [c for c in cases if c.kind == "correctness"]
     grounding = [c for c in cases if c.kind == "grounding"]
@@ -105,3 +105,15 @@ def test_bundled_calibration_set_covers_every_verdict() -> None:
         (False, False),
     }
     assert {c.language for c in cases} == {"vi", "en"}
+
+
+def test_calibration_v2_keeps_v1_and_adds_terse_answers() -> None:
+    folder = REPO / "datasets" / "judge_calibration"
+    v1 = load_calibration(folder / "cases-v1.jsonl")
+
+    v2 = load_calibration(folder / "cases-v2.jsonl")
+
+    assert v1 == v2[: len(v1)]
+    added = v2[len(v1) :]
+    assert added
+    assert all("terse" in case.note for case in added)

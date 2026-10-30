@@ -220,7 +220,7 @@ async def test_report_records_every_version_and_no_text_by_default() -> None:
     assert report.answer_model == "fake-answer"
     assert report.answer_prompt_version == "answer-v1"
     assert report.judge_model == "fake-judge"
-    assert report.judge_prompt_version == "judge-v1"
+    assert report.judge_prompt_version == "judge-v2"
     assert report.settings == SETTINGS
     assert report.code_revision == "abc1234"
     assert report.answer_input_tokens == 100

@@ -26,7 +26,7 @@ from enterprise_knowledge.infrastructure.fpt.chat import FptChatModel
 from enterprise_knowledge.infrastructure.fpt.client import FptClient, RetryPolicy
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CASES = ROOT / "datasets" / "judge_calibration" / "cases-v1.jsonl"
+DEFAULT_CASES = ROOT / "datasets" / "judge_calibration" / "cases-v2.jsonl"
 DEFAULT_OUT_DIR = ROOT / "docs" / "evaluation"
 
 
