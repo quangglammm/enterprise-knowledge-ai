@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/* Harbor palette: cool mist ground, harbor-ink text, one colour per answer mode. */
+@theme {
+  --color-mist: #edf1ef;
+  --color-mist-deep: #dde5e2;
+  --color-ink: #163238;
+  --color-ink-soft: #4b6267;
+  --color-teal: #2f6b73;
+  --color-bamboo: #6b8f3e;
+  --color-amber: #d99a1e;
+  --color-brick: #b3412e;
+  --font-sans: var(--font-be-vietnam), system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-mist text-ink antialiased;
+    font-feature-settings: "tnum" 1;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-teal;
+  }
+}
+
+@keyframes stop-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

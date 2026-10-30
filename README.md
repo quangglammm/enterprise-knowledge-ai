@@ -42,6 +42,8 @@ curl -i http://localhost:8000/health/ready
 | Integration tests | `docker compose up -d postgres` then `EKA_TEST_DATABASE_URL=postgresql://eka:eka@localhost:5432/eka_test uv run pytest -m integration` |
 | Apply migrations | `uv run eka-migrate` |
 | Run the ingestion worker | `uv run eka-worker` (processes uploads queued by the API; stops cleanly on SIGTERM) |
+| Run the web UI | `cd web && pnpm install && pnpm dev`, then open http://localhost:3000 (ask, compare direct and workflow answers, upload documents; ADR-0018) |
+| Web UI checks | `cd web && pnpm lint && pnpm typecheck && pnpm test && pnpm build` |
 | Retrieval benchmark | `uv run python scripts/run_benchmark.py --database-url postgresql://eka:eka@localhost:5432/eka_test` (wipes that database; add `--embedding fpt` for real retrieval, paid) |
 | Retrieval experiment | `uv run python scripts/run_benchmark.py --database-url ... --experiment experiments/week4/packed-1200.toml` (add `--embedding hashing` for a free dry run) |
 | Compare reports | `uv run python scripts/compare_reports.py <baseline.json> <candidate.json> ...` |
@@ -129,6 +131,7 @@ src/enterprise_knowledge/
   worker/         ingestion worker process (eka-worker): poll loop, backoff, graceful shutdown
   observability/  structured logging, later tracing and metrics
   config.py       typed settings
+web/              Next.js UI (pnpm, Tailwind): ask, compare answer modes, upload documents (ADR-0018)
 tests/
   unit/           fast tests, no external services
   contract/       behavior every port implementation must have (fake and Postgres)
@@ -188,6 +191,7 @@ More packages (`agents`, `worker`) are added when their first feature lands, rat
 - [ADR-0015: Answer-quality evaluation with a calibrated LLM judge](docs/adr/0015-answer-quality-evaluation.md)
 - [ADR-0016: Asynchronous ingestion with a Postgres job queue](docs/adr/0016-asynchronous-ingestion.md)
 - [ADR-0017: A bounded plan–retrieve–answer workflow, chosen per request](docs/adr/0017-bounded-answer-workflow.md)
+- [ADR-0018: A Next.js web UI for asking and comparing answer modes](docs/adr/0018-web-ui.md)
 
 ## Data
 

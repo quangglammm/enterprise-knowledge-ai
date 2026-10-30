@@ -33,3 +33,6 @@ data/
 # Claude Code personal overrides
 CLAUDE.local.md
 .claude/settings.local.json
+
+# Browser automation screenshots and snapshots
+.playwright-mcp/

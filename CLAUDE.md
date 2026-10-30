@@ -43,6 +43,8 @@ domain                  Pydantic models + Protocol ports; stdlib and pydantic on
 
 Create a package when its first feature lands; do not add empty placeholder modules.
 
+The browser UI lives in `web/` (Next.js, pnpm, Tailwind; ADR-0018). It is an HTTP client of `/v1` only, with no business rules. Run its checks with `pnpm lint && pnpm typecheck && pnpm test && pnpm build` in `web/`; use pnpm, never npm.
+
 ## Non-negotiables
 
 - Access control is enforced inside the retrieval query (tenant and ACL filter). Filtering after retrieval is a bug.

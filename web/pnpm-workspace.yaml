@@ -1,0 +1,4 @@
+allowBuilds:
+  esbuild: true  # vitest's bundler verifies its platform binary on install
+  sharp: false
+  unrs-resolver: false
