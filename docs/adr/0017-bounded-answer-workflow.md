@@ -50,6 +50,16 @@ Routing option 1 and workflow option 1.
 - **Logging:** logs record states, counts and fallbacks, never text.
 - **Evaluation:** `scripts/run_answer_eval.py --mode workflow` runs the EVAL-02 evaluation through the workflow. Reports record the mode, workflow limits, model calls and planner tokens next to answer and judge tokens.
 
+## Results (2026-10-30)
+
+On benchmark v2 the workflow is not better than direct RAG. Write-up: `docs/evaluation/agent01-direct-vs-workflow.md`.
+
+- **Outcomes:** they differ on 1 of 115 questions, and the workflow is worse there (q038 abstained). Correct-or-partial is 93% against 94%.
+- **Cost:** twice the model calls (230 against 115) and 20.6k planner input tokens.
+- **Why:** the planner keeps 97 questions as a single part, which reproduces direct exactly. Direct already answers 7 of the 8 multi-document questions, and the real misses are cross-lingual retrieval failures that `planner-v1` does not address.
+
+`direct` stays the default. A `planner-v2` that adds a query in the other language is the next hypothesis.
+
 ## Consequences
 
 - **Cost:** the workflow costs one more model call (the planner, about 190 input tokens) and up to 3× the searches. It is worth enabling only if the direct-vs-workflow comparison on benchmark v2 shows a gain where direct RAG fails (multi-part and cross-lingual questions) without losses elsewhere.
