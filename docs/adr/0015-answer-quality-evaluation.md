@@ -58,6 +58,17 @@ Structure: one call returning all three verdicts (cheaper, but one verdict can s
 - **Rerun** (`judge-calibration-20261030-040008.json`): agreement was 12/12 on correctness, 12/12 on faithfulness and 12/12 on citation support, with 0 judge errors. The answer text that instructs the judge (`corr-en-06`) and the evidence that instructs it (`grnd-vi-05`) were both judged correctly. The run used 6,876 input and 817 output tokens.
 - **Limits:** 24 clear-cut cases, written by the same author as the benchmark, show the judge follows the rubric. They do not show how it handles borderline real answers, and they do not measure self-preference on the model's own answers. The slice-2 write-up therefore reports judged metrics together with the deterministic ones, and spot-checks a sample of real verdicts by hand.
 
+## Results (2026-10-30)
+
+Benchmark v2, code `6544b58`, judge `judge-v2`. Write-up: `docs/evaluation/eval02-answer-quality.md`.
+
+- **Deterministic:** 96% answer rate, 100% abstention accuracy, 99% of answers cite a gold chunk.
+- **Judged:** 100% faithfulness and citation support. Correctness is 63% strict and 94% counting partial answers.
+- **Review:** the review of every verdict other than `correct` puts correctness at 92%.
+  - The judge's correctness agrees with the review on 70% of real answers, not the 93% calibration suggested. Every disagreement errs on the strict side: terse answers are marked partial whenever the reference states more than the question asked.
+  - Strict judged correctness is therefore a lower bound and is not quoted as answer quality; "correct or partial" is the proxy.
+  - A `judge-v3` must be calibrated on real terse answers from this run.
+
 ## Consequences
 
 - **Confidence in judged numbers:** they are only as trustworthy as calibration agreement on 24 cases. A metric whose agreement is poor is reported as unreliable, not tuned around.
