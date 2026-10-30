@@ -241,6 +241,10 @@ async def test_workflow_usage_is_recorded_for_comparison_with_direct() -> None:
         model_calls=2,
         planner_input_tokens=40,
         planner_output_tokens=12,
+        verified=True,
+        revisions=1,
+        verifier_input_tokens=30,
+        verifier_output_tokens=8,
     )
 
     report = await evaluate_answers(
@@ -259,3 +263,5 @@ async def test_workflow_usage_is_recorded_for_comparison_with_direct() -> None:
         40,
         12,
     )
+    assert (outcome.verified, outcome.revisions) == (True, 1)
+    assert (report.revised_answers, report.verifier_input_tokens) == (1, 30)

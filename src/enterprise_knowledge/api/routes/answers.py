@@ -38,6 +38,13 @@ class UsageOut(BaseModel):
     model_calls: int
 
 
+class VerificationOut(BaseModel):
+    """Workflow answers are checked claim by claim against their evidence (ADR-0019)."""
+
+    verified: bool | None  # None: not verified (direct mode, or nothing was claimed)
+    revisions: int
+
+
 class CitationOut(BaseModel):
     """A cited chunk with enough source metadata to show and highlight it."""
 
@@ -78,6 +85,7 @@ class AnswerOut(BaseModel):
     # the question only, never from documents.
     sub_questions: list[str]
     usage: UsageOut
+    verification: VerificationOut
 
     @classmethod
     def of(cls, answered: ModeAnswer) -> "AnswerOut":
@@ -96,6 +104,7 @@ class AnswerOut(BaseModel):
             mode=answered.mode,
             sub_questions=list(answered.sub_questions),
             usage=UsageOut(steps=answered.steps, model_calls=answered.model_calls),
+            verification=VerificationOut(verified=answered.verified, revisions=answered.revisions),
         )
 
 

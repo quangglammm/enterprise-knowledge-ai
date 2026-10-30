@@ -51,6 +51,7 @@ class AnswerResult(BaseModel):
     prompt_version: str
     model_id: str | None = None
     repaired: bool = False
+    revised: bool = False  # answered again after verification found unsupported claims
     # Summed over the model calls of this answer (the repair included); 0 without a call.
     input_tokens: int = 0
     output_tokens: int = 0
@@ -75,13 +76,17 @@ class GenerateAnswer:
         self._timeout = timeout_seconds
         self._max_output_tokens = max_output_tokens
 
-    async def __call__(self, question: str, evidence: Sequence[RetrievedEvidence]) -> AnswerResult:
-        """``question`` must already be NFC-normalized; ``evidence`` must not be empty."""
+    async def __call__(
+        self, question: str, evidence: Sequence[RetrievedEvidence], *, revise: bool = False
+    ) -> AnswerResult:
+        """``question`` must already be NFC-normalized; ``evidence`` must not be empty.
+
+        ``revise`` adds the fixed revision instruction (AGENT-02) to the same prompt."""
         if not evidence:
             raise ValueError("generation needs at least one evidence item")
         evidence = tuple(evidence)
         labels = {evidence_label(i): item.chunk_id for i, item in enumerate(evidence)}
-        messages = answer_messages(question, evidence)
+        messages = answer_messages(question, evidence, revise=revise)
         # One deadline for the whole answer, the repair attempt included (ADR-0009).
         try:
             async with asyncio.timeout(self._timeout):
@@ -118,6 +123,7 @@ class GenerateAnswer:
             prompt_version=PROMPT_VERSION,
             model_id=replies[-1].model_id,
             repaired=len(replies) > 1,
+            revised=revise,
             input_tokens=usage["input_tokens"],
             output_tokens=usage["output_tokens"],
             model_latency_ms=usage["latency_ms"],

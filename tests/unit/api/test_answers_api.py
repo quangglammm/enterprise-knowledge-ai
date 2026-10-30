@@ -152,13 +152,15 @@ def test_mode_defaults_to_direct_and_reports_usage() -> None:
 
     assert body["mode"] == "direct"
     assert body["sub_questions"] == []
+    assert body["verification"] == {"verified": None, "revisions": 0}
     assert body["usage"] == {"steps": 2, "model_calls": 1}
     assert len(client.chat.requests) == 1
 
 
 def test_workflow_mode_returns_its_sub_questions() -> None:
     plan = json.dumps({"sub_questions": ["Số ngày phép năm?", "Ngày phép chuyển sang năm sau?"]})
-    client = Client(plan, answered("E1"))
+    verified = json.dumps({"claims": [{"claim": "12 ngày", "supported_by": ["E1"]}]})
+    client = Client(plan, answered("E1"), verified)
     with client.http as http:
         upload(http, STAFF)
 
@@ -168,7 +170,8 @@ def test_workflow_mode_returns_its_sub_questions() -> None:
     body = response.json()
     assert body["mode"] == "workflow"
     assert body["sub_questions"] == ["Số ngày phép năm?", "Ngày phép chuyển sang năm sau?"]
-    assert body["usage"] == {"steps": 4, "model_calls": 2}
+    assert body["usage"] == {"steps": 5, "model_calls": 3}
+    assert body["verification"] == {"verified": True, "revisions": 0}
     assert body["status"] == "answered"
 
 

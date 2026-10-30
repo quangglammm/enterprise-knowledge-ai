@@ -25,3 +25,9 @@ class WorkflowTimeoutError(WorkflowError):
     """The workflow's wall-clock deadline passed before it could finish."""
 
     category: ClassVar[str] = "workflow_timeout"
+
+
+class VerifierOutputError(WorkflowError):
+    """The verifier's reply could not be read; the workflow then fails closed (abstains)."""
+
+    category: ClassVar[str] = "verifier_output_invalid"

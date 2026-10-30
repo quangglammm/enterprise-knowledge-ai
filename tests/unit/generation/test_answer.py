@@ -14,7 +14,11 @@ from enterprise_knowledge.generation.errors import (
     ModelTimeoutError,
     UnresolvedCitationError,
 )
-from enterprise_knowledge.generation.prompts import PROMPT_VERSION, SYSTEM_PROMPT
+from enterprise_knowledge.generation.prompts import (
+    PROMPT_VERSION,
+    REVISION_INSTRUCTION,
+    SYSTEM_PROMPT,
+)
 from enterprise_knowledge.ingestion.ingest import IngestDocument
 from enterprise_knowledge.retrieval.search import SearchKnowledge
 from tests.factories import TENANT, make_evidence, make_policy, make_principal
@@ -225,3 +229,24 @@ async def test_generate_answer_works_on_given_evidence_and_reports_usage() -> No
 async def test_generate_answer_requires_evidence() -> None:
     with pytest.raises(ValueError, match="evidence"):
         await GenerateAnswer(chat=ScriptedChatModel([]))(QUESTION, [])
+
+
+async def test_a_revision_adds_only_our_fixed_instruction() -> None:
+    chat = ScriptedChatModel([answered("E1")])
+    evidence = [make_evidence("c1", text="Employees receive twelve days of annual leave.")]
+
+    result = await GenerateAnswer(chat=chat)(QUESTION, evidence, revise=True)
+
+    system, user, revision = chat.requests[0].messages
+    assert (system.role, user.role, revision.role) == ("system", "user", "user")
+    assert revision.content == REVISION_INSTRUCTION
+    assert result.revised
+
+
+async def test_a_normal_answer_has_no_revision_instruction() -> None:
+    chat = ScriptedChatModel([answered("E1")])
+
+    result = await GenerateAnswer(chat=chat)(QUESTION, [make_evidence("c1")])
+
+    assert len(chat.requests[0].messages) == 2
+    assert not result.revised

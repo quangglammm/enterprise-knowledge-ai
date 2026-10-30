@@ -34,11 +34,45 @@ class _ModelAnswer(BaseModel):
     abstention_reason: str | None = None
 
 
-def parse_answer(content: str, labels: Mapping[str, ChunkId]) -> AnswerResponse:
+def clean_json_reply(content: str) -> str:
+    """Strip a Markdown fence, drop text after the first complete JSON value, and close
+    objects or arrays left open at the end.
+
+    Open-weight models often fence their JSON, sometimes drop the final ``}`` and sometimes
+    append a note after it (all seen from Llama-3.3-70B in calibration). Only closing
+    brackets are added, never content: a reply that ends inside a string is returned as is
+    and fails validation.
+    """
     body = content.strip()
     fenced = _FENCE.match(body)
     if fenced:
         body = fenced.group("body")
+    closers = {"{": "}", "[": "]"}
+    stack: list[str] = []
+    in_string = escaped = False
+    for index, char in enumerate(body):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+        elif char == '"':
+            in_string = True
+        elif char in closers:
+            stack.append(closers[char])
+        elif char in "}]" and stack and stack[-1] == char:
+            stack.pop()
+            if not stack:  # the first complete value ends here; ignore any trailing note
+                return body[: index + 1]
+    if in_string or not stack:
+        return body
+    return body + "".join(reversed(stack))
+
+
+def parse_answer(content: str, labels: Mapping[str, ChunkId]) -> AnswerResponse:
+    body = clean_json_reply(content)
     try:
         output = _ModelAnswer.model_validate_json(body)
     except ValidationError as exc:

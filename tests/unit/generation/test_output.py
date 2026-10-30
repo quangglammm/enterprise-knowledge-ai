@@ -10,7 +10,7 @@ from enterprise_knowledge.generation.errors import (
     InvalidModelOutputError,
     UnresolvedCitationError,
 )
-from enterprise_knowledge.generation.output import parse_answer
+from enterprise_knowledge.generation.output import clean_json_reply, parse_answer
 
 LABELS = {"E1": ChunkId("c1"), "E2": ChunkId("c2")}
 
@@ -92,3 +92,35 @@ def test_citation_outside_the_evidence_raises(content: str) -> None:
         parse_answer(content, LABELS)
 
     assert excinfo.value.category == "unknown_citation"
+
+
+@pytest.mark.parametrize(
+    ("content", "cleaned"),
+    [
+        ('```json\n{"a": 1}\n```', '{"a": 1}'),
+        ('{"claims": [{"x": 1}]', '{"claims": [{"x": 1}]}'),  # final "}" dropped
+        ('{"a": "text with } and ] inside"', '{"a": "text with } and ] inside"}'),
+        ('{"a": "cut inside a str', '{"a": "cut inside a str'),  # never guessed
+        ('{"a": 1}', '{"a": 1}'),
+        # Seen from Llama-3.3-70B on calibration case grnd-en-05: a note after the object.
+        ('{"a": [1]}\n\nNote: the answer cites the wrong block.', '{"a": [1]}'),
+        ('{"a": "} not the end"} trailing', '{"a": "} not the end"}'),
+    ],
+    ids=[
+        "fence",
+        "unterminated",
+        "brackets-in-string",
+        "cut-in-string",
+        "untouched",
+        "trailing-note",
+        "brace-in-string-then-note",
+    ],
+)
+def test_json_replies_are_cleaned_without_inventing_content(content: str, cleaned: str) -> None:
+    assert clean_json_reply(content) == cleaned
+
+
+def test_answer_missing_its_final_brace_is_accepted() -> None:
+    content = answered("12 ngày.", "E1").removesuffix("}")
+
+    assert parse_answer(content, LABELS).citations[0].chunk_id == "c1"

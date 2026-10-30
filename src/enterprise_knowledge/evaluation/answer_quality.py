@@ -85,6 +85,10 @@ class AnswerOutcome(BaseModel):
     answer_output_tokens: int = 0
     planner_input_tokens: int = 0
     planner_output_tokens: int = 0
+    verified: bool | None = None  # workflow verification (ADR-0019)
+    revisions: int = 0
+    verifier_input_tokens: int = 0
+    verifier_output_tokens: int = 0
     judge_input_tokens: int = 0
     judge_output_tokens: int = 0
     answer: str | None = None  # only with keep_text
@@ -130,6 +134,10 @@ class AnswerQualityReport(BaseModel):
     answer_output_tokens: int
     planner_input_tokens: int
     planner_output_tokens: int
+    revised_answers: int  # workflow answers regenerated after failed verification
+    verification_abstentions: int  # answers withheld because verification failed
+    verifier_input_tokens: int
+    verifier_output_tokens: int
     judge_input_tokens: int
     judge_output_tokens: int
     outcomes: list[AnswerOutcome]
@@ -182,6 +190,10 @@ async def evaluate_answers(
         answer_output_tokens=sum(o.answer_output_tokens for o in outcomes),
         planner_input_tokens=sum(o.planner_input_tokens for o in outcomes),
         planner_output_tokens=sum(o.planner_output_tokens for o in outcomes),
+        revised_answers=sum(1 for o in outcomes if o.revisions),
+        verification_abstentions=sum(1 for o in outcomes if o.verified is False),
+        verifier_input_tokens=sum(o.verifier_input_tokens for o in outcomes),
+        verifier_output_tokens=sum(o.verifier_output_tokens for o in outcomes),
         judge_input_tokens=sum(o.judge_input_tokens for o in outcomes),
         judge_output_tokens=sum(o.judge_output_tokens for o in outcomes),
         outcomes=outcomes,
@@ -215,6 +227,10 @@ async def _evaluate(
         "model_calls": answered.model_calls,
         "planner_input_tokens": answered.planner_input_tokens,
         "planner_output_tokens": answered.planner_output_tokens,
+        "verified": answered.verified,
+        "revisions": answered.revisions,
+        "verifier_input_tokens": answered.verifier_input_tokens,
+        "verifier_output_tokens": answered.verifier_output_tokens,
     }
     if question.answerable:
         fields["retrieved_gold"] = any(item.chunk_id in gold for item in result.evidence)

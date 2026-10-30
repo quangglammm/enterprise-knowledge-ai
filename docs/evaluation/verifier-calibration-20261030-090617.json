@@ -1,0 +1,125 @@
+{
+  "started_at": "2026-10-30T09:06:17.326788+00:00",
+  "verifier_model": "Llama-3.3-70B-Instruct",
+  "verifier_prompt_version": "verifier-v1",
+  "dataset_sha256": "a2eafd26af69a9430ffc481137afabca17adb2c37b036f467f8be733b02f0a27",
+  "cases": 12,
+  "errors": 1,
+  "agreement": 1.0,
+  "outcomes": [
+    {
+      "case_id": "grnd-vi-01",
+      "expected_supported": true,
+      "verified_supported": true,
+      "agrees": true,
+      "claims": 1,
+      "unsupported_claims": 0,
+      "input_tokens": 296,
+      "output_tokens": 33
+    },
+    {
+      "case_id": "grnd-vi-02",
+      "expected_supported": true,
+      "verified_supported": true,
+      "agrees": true,
+      "claims": 1,
+      "unsupported_claims": 0,
+      "input_tokens": 360,
+      "output_tokens": 33
+    },
+    {
+      "case_id": "grnd-vi-03",
+      "expected_supported": false,
+      "verified_supported": false,
+      "agrees": true,
+      "claims": 1,
+      "unsupported_claims": 1,
+      "input_tokens": 280,
+      "output_tokens": 26
+    },
+    {
+      "case_id": "grnd-vi-04",
+      "expected_supported": true,
+      "verified_supported": true,
+      "agrees": true,
+      "claims": 1,
+      "unsupported_claims": 0,
+      "input_tokens": 288,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "grnd-vi-05",
+      "expected_supported": false,
+      "verified_supported": false,
+      "agrees": true,
+      "claims": 1,
+      "unsupported_claims": 1,
+      "input_tokens": 332,
+      "output_tokens": 28
+    },
+    {
+      "case_id": "grnd-vi-06",
+      "expected_supported": true,
+      "verified_supported": true,
+      "agrees": true,
+      "claims": 1,
+      "unsupported_claims": 0,
+      "input_tokens": 301,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "grnd-vi-07",
+      "expected_supported": false,
+      "verified_supported": false,
+      "agrees": true,
+      "claims": 3,
+      "unsupported_claims": 1,
+      "input_tokens": 316,
+      "output_tokens": 91
+    },
+    {
+      "case_id": "grnd-en-01",
+      "expected_supported": false,
+      "verified_supported": false,
+      "agrees": true,
+      "claims": 2,
+      "unsupported_claims": 1,
+      "input_tokens": 282,
+      "output_tokens": 46
+    },
+    {
+      "case_id": "grnd-en-02",
+      "expected_supported": true,
+      "verified_supported": true,
+      "agrees": true,
+      "claims": 2,
+      "unsupported_claims": 0,
+      "input_tokens": 331,
+      "output_tokens": 58
+    },
+    {
+      "case_id": "grnd-en-03",
+      "expected_supported": true,
+      "verified_supported": true,
+      "agrees": true,
+      "claims": 2,
+      "unsupported_claims": 0,
+      "input_tokens": 328,
+      "output_tokens": 48
+    },
+    {
+      "case_id": "grnd-en-04",
+      "expected_supported": false,
+      "verified_supported": false,
+      "agrees": true,
+      "claims": 2,
+      "unsupported_claims": 1,
+      "input_tokens": 294,
+      "output_tokens": 50
+    },
+    {
+      "case_id": "grnd-en-05",
+      "error_category": "verifier_output_invalid"
+    }
+  ]
+}

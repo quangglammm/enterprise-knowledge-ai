@@ -28,6 +28,12 @@ class ModeAnswer(BaseModel):
     # The workflow's planning call, on top of the answer's own tokens; 0 in direct mode.
     planner_input_tokens: int = 0
     planner_output_tokens: int = 0
+    # Workflow only (ADR-0019): whether the final answer passed verification, and how many
+    # revisions it took. None when nothing was verified, as in direct mode.
+    verified: bool | None = None
+    revisions: int = 0
+    verifier_input_tokens: int = 0
+    verifier_output_tokens: int = 0
 
 
 class AnswerModes:
@@ -48,6 +54,10 @@ class AnswerModes:
                 model_calls=run.model_calls,
                 planner_input_tokens=run.planner_input_tokens,
                 planner_output_tokens=run.planner_output_tokens,
+                verified=run.verified,
+                revisions=run.revisions,
+                verifier_input_tokens=run.verifier_input_tokens,
+                verifier_output_tokens=run.verifier_output_tokens,
             )
         answer = await self._direct(principal, question)
         generated = bool(answer.evidence)  # AnswerQuestion calls the model only with evidence

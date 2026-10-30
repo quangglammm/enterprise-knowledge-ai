@@ -3,12 +3,17 @@ import type { AnswerResponse } from "./api";
 // The stops an answer actually went through, for its route line. Derived from the mode,
 // the sub-questions and whether the model was called, never guessed.
 export function routeStops(answer: AnswerResponse): string[] {
-  const end = answer.status === "answered" ? "Answer" : "No evidence";
-  if (answer.mode === "workflow") {
-    const searches = answer.sub_questions.map((_, i) => `Search ${i + 1}`);
-    return ["Plan", ...searches, end];
+  if (answer.mode === "direct") {
+    return ["Search", answer.status === "answered" ? "Answer" : "No evidence"];
   }
-  return ["Search", end];
+  const searches = answer.sub_questions.map((_, i) => `Search ${i + 1}`);
+  const { verified, revisions } = answer.verification;
+  if (verified === null) {
+    // Nothing was verified: no evidence, or the model itself abstained.
+    return ["Plan", ...searches, answer.status === "answered" ? "Answer" : "No evidence"];
+  }
+  const revision = revisions > 0 ? ["Check", "Revise"] : [];
+  return ["Plan", ...searches, "Answer", ...revision, verified ? "Verified" : "Withheld"];
 }
 
 export type AnswerPart = { text: string } | { label: string };

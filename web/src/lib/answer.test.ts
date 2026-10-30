@@ -14,6 +14,7 @@ function answer(overrides: Partial<AnswerResponse>): AnswerResponse {
     mode: "direct",
     sub_questions: [],
     usage: { steps: 2, model_calls: 1 },
+    verification: { verified: null, revisions: 0 },
     ...overrides,
   };
 }
@@ -29,14 +30,38 @@ describe("routeStops", () => {
     expect(routeStops(abstained)).toEqual(["Search", "No evidence"]);
   });
 
-  it("shows the workflow's plan and one search per sub-question", () => {
+  it("shows the workflow's plan, one search per sub-question and the verification", () => {
     const workflow = answer({
       mode: "workflow",
       sub_questions: ["Số ngày phép năm?", "Ngày phép chuyển sang năm sau?"],
-      usage: { steps: 4, model_calls: 2 },
+      usage: { steps: 5, model_calls: 3 },
+      verification: { verified: true, revisions: 0 },
     });
 
-    expect(routeStops(workflow)).toEqual(["Plan", "Search 1", "Search 2", "Answer"]);
+    expect(routeStops(workflow)).toEqual(["Plan", "Search 1", "Search 2", "Answer", "Verified"]);
+  });
+
+  it("shows a revision after a failed check", () => {
+    const revised = answer({
+      mode: "workflow",
+      sub_questions: ["Số ngày phép năm?"],
+      verification: { verified: true, revisions: 1 },
+    });
+
+    expect(routeStops(revised)).toEqual(["Plan", "Search 1", "Answer", "Check", "Revise", "Verified"]);
+  });
+
+  it("ends in withheld when the answer still failed verification", () => {
+    const withheld = answer({
+      mode: "workflow",
+      status: "insufficient_evidence",
+      answer: null,
+      abstention_reason: "unsupported_claims",
+      sub_questions: ["Số ngày phép năm?"],
+      verification: { verified: false, revisions: 1 },
+    });
+
+    expect(routeStops(withheld)).toEqual(["Plan", "Search 1", "Answer", "Check", "Revise", "Withheld"]);
   });
 
   it("ends the workflow route in no evidence when it abstained", () => {

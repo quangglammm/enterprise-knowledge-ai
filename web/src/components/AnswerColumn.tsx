@@ -17,7 +17,7 @@ const TITLES: Record<AnswerMode, string> = {
 };
 const DESCRIPTIONS: Record<AnswerMode, string> = {
   direct: "One search, then one answer.",
-  workflow: "Splits the question, searches each part, then answers once.",
+  workflow: "Splits the question, searches each part, answers, then checks every claim.",
 };
 
 function seconds(ms: number): string {
@@ -94,6 +94,11 @@ function Answer({
               <span key={i}>{part.text}</span>
             ),
           )}
+        </p>
+      ) : answer.verification.verified === false ? (
+        <p className="text-lg text-ink-soft">
+          An answer was drafted but withheld: the evidence did not support all of it, even after
+          a revision. Try a narrower question.
         </p>
       ) : (
         <p className="text-lg text-ink-soft">

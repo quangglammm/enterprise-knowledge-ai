@@ -48,6 +48,7 @@ curl -i http://localhost:8000/health/ready
 | Retrieval experiment | `uv run python scripts/run_benchmark.py --database-url ... --experiment experiments/week4/packed-1200.toml` (add `--embedding hashing` for a free dry run) |
 | Compare reports | `uv run python scripts/compare_reports.py <baseline.json> <candidate.json> ...` |
 | Judge calibration | `uv run python scripts/judge_calibration.py` (paid FPT calls; EVAL-02 judge agreement on hand-labelled cases) |
+| Verifier calibration | `uv run python scripts/verifier_calibration.py` (paid FPT calls; AGENT-02 verifier agreement on the grounding cases) |
 | Add a dependency | `uv add <pkg>` (dev: `uv add --dev <pkg>`) |
 
 CI runs the same checks on every pull request (`.github/workflows/ci.yml`).
@@ -93,7 +94,7 @@ Tests and CI never call a model provider.
 | `GET /v1/documents/{id}/chunks` | Chunks of the current (or `?version=`) version, with page, section and character offsets. Superseded versions have no chunks (ADR-0008). |
 | `DELETE /v1/documents/{id}` | Remove every version from search and storage. `204`, also when already deleted. |
 | `POST /v1/search` | `{"query": "...", "k": 5}` returns access-checked evidence, ranked by vector similarity or, with `EKA_RETRIEVAL_MODE=hybrid`, by vector plus full-text search (ADR-0014). |
-| `POST /v1/answers` | `{"question": "...", "mode": "direct" \| "workflow"}` returns an answer with validated citations, or `status: insufficient_evidence`, plus `mode`, `sub_questions` and `usage` (steps, model calls). `workflow` plans up to 3 sub-questions, searches each and answers once (ADR-0017); without `mode`, `EKA_ANSWER_MODE` (default `direct`) decides. Model failures are `502`/`504`. Provider failures are `502`, or `503` when throttled. Returns `503` when no chat model is configured (`EKA_LLM_API_KEY`). |
+| `POST /v1/answers` | `{"question": "...", "mode": "direct" \| "workflow"}` returns an answer with validated citations, or `status: insufficient_evidence`, plus `mode`, `sub_questions` and `usage` (steps, model calls). `workflow` plans up to 3 sub-questions, searches each, answers once and verifies every claim against the evidence, revising once or abstaining when it is unsupported (ADR-0017, ADR-0019; `verification` in the response); without `mode`, `EKA_ANSWER_MODE` (default `direct`) decides. Model failures are `502`/`504`. Provider failures are `502`, or `503` when throttled. Returns `503` when no chat model is configured (`EKA_LLM_API_KEY`). |
 
 Interactive docs are at `/docs` when the API runs.
 
@@ -192,6 +193,7 @@ More packages (`agents`, `worker`) are added when their first feature lands, rat
 - [ADR-0016: Asynchronous ingestion with a Postgres job queue](docs/adr/0016-asynchronous-ingestion.md)
 - [ADR-0017: A bounded plan–retrieve–answer workflow, chosen per request](docs/adr/0017-bounded-answer-workflow.md)
 - [ADR-0018: A Next.js web UI for asking and comparing answer modes](docs/adr/0018-web-ui.md)
+- [ADR-0019: Claim-level verification in the answer workflow](docs/adr/0019-answer-verification.md)
 
 ## Data
 

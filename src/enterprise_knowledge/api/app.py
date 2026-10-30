@@ -130,7 +130,6 @@ def build_services(
                     max_sub_questions=settings.workflow_max_sub_questions,
                     k_per_question=settings.answer_top_k,
                     max_evidence=settings.workflow_max_evidence,
-                    max_steps=settings.workflow_max_sub_questions + 2,
                     timeout_seconds=settings.workflow_timeout_seconds,
                 ),
                 min_score=settings.answer_min_score,

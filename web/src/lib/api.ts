@@ -31,6 +31,8 @@ export interface AnswerResponse {
   mode: AnswerMode;
   sub_questions: string[];
   usage: { steps: number; model_calls: number };
+  // Workflow answers are checked claim by claim (ADR-0019); null when nothing was verified.
+  verification: { verified: boolean | null; revisions: number };
 }
 
 export interface Job {

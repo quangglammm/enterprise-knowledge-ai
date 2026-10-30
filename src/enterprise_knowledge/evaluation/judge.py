@@ -14,7 +14,6 @@ answer prompt. Invalid output gets one repair attempt, then a typed failure.
 """
 
 import asyncio
-import re
 from collections.abc import Callable, Sequence
 from enum import StrEnum
 from typing import ClassVar
@@ -25,12 +24,12 @@ from enterprise_knowledge.domain.chat import ChatMessage, ChatRequest, ChatRespo
 from enterprise_knowledge.domain.errors import DomainError
 from enterprise_knowledge.domain.ports import ChatModel
 from enterprise_knowledge.domain.retrieval import RetrievedEvidence
+from enterprise_knowledge.generation.output import clean_json_reply
 from enterprise_knowledge.generation.prompts import escape_markup, evidence_block, evidence_label
 
 JUDGE_PROMPT_VERSION = "judge-v2"
 DEFAULT_TIMEOUT_SECONDS = 60.0
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
-_FENCE = re.compile(r"^```(?:json)?\s*(?P<body>.*?)\s*```$", re.DOTALL | re.IGNORECASE)
 
 CORRECTNESS_SYSTEM_PROMPT = """\
 You grade an answer to an employee's question against a reference answer.
@@ -208,7 +207,7 @@ class AnswerJudge:
             async with asyncio.timeout(self._timeout):
                 replies = [await self._complete(messages)]
                 try:
-                    return parse(_unfence(replies[0].content)), replies
+                    return parse(clean_json_reply(replies[0].content)), replies
                 except ValueError as exc:  # ValidationError is a ValueError
                     retry = (
                         *messages,
@@ -217,7 +216,7 @@ class AnswerJudge:
                     )
                     replies.append(await self._complete(retry))
                 try:
-                    return parse(_unfence(replies[-1].content)), replies
+                    return parse(clean_json_reply(replies[-1].content)), replies
                 except ValueError as exc:
                     raise JudgeOutputError(_describe(exc)) from None
         except TimeoutError as exc:
@@ -231,41 +230,6 @@ class AnswerJudge:
             json_mode=True,
         )
         return await self._chat.complete(request)
-
-
-def _unfence(content: str) -> str:
-    body = content.strip()
-    fenced = _FENCE.match(body)
-    return _close_unterminated(fenced.group("body") if fenced else body)
-
-
-def _close_unterminated(body: str) -> str:
-    """Append the closers of objects and arrays left open at the end of ``body``.
-
-    Llama-3.3-70B sometimes drops the final ``}`` of a reply (calibration case grnd-vi-06).
-    Only closing brackets are added, never content: a reply that ends inside a string is
-    returned unchanged and fails validation as before.
-    """
-    closers = {"{": "}", "[": "]"}
-    stack: list[str] = []
-    in_string = escaped = False
-    for char in body:
-        if in_string:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == '"':
-                in_string = False
-        elif char == '"':
-            in_string = True
-        elif char in closers:
-            stack.append(closers[char])
-        elif char in "}]" and stack and stack[-1] == char:
-            stack.pop()
-    if in_string or not stack:
-        return body
-    return body + "".join(reversed(stack))
 
 
 def _describe(exc: ValueError) -> str:

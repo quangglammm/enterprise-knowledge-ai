@@ -15,6 +15,7 @@ from tests.fakes.embedder import HashEmbedder
 
 ANSWER = json.dumps({"status": "answered", "answer": "14 days [E1].", "citations": ["E1"]})
 PLAN = json.dumps({"sub_questions": ["annual leave days?"]})
+VERIFIED = json.dumps({"claims": [{"claim": "14 days", "supported_by": ["E1"]}]})
 
 
 async def modes(*script: str, documents: bool = True) -> tuple[AnswerModes, ScriptedChatModel]:
@@ -46,6 +47,7 @@ async def test_direct_mode_makes_no_agent_calls() -> None:
 
     assert result.mode == "direct"
     assert (result.model_calls, result.steps) == (1, 2)  # retrieve, answer
+    assert result.verified is None  # direct answers are not verified (ADR-0019)
     assert result.sub_questions == ()
     assert len(chat.requests) == 1  # no planner
 
@@ -60,11 +62,12 @@ async def test_direct_abstention_without_evidence_costs_no_model_call() -> None:
 
 
 async def test_workflow_mode_reports_its_plan_and_usage() -> None:
-    answer, chat = await modes(PLAN, ANSWER)
+    answer, chat = await modes(PLAN, ANSWER, VERIFIED)
 
     result = await answer(make_principal(), "How many days of annual leave?", mode="workflow")
 
     assert result.mode == "workflow"
     assert result.sub_questions == ("annual leave days?",)
-    assert (result.model_calls, result.steps) == (2, 3)  # plan, retrieve, answer
-    assert len(chat.requests) == 2
+    assert (result.model_calls, result.steps) == (3, 4)  # plan, retrieve, answer, verify
+    assert (result.verified, result.revisions) == (True, 0)
+    assert len(chat.requests) == 3

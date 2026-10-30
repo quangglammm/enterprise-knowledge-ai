@@ -93,7 +93,9 @@ def print_report(report: AnswerQualityReport) -> None:
             )
     print(
         f"mode {report.settings.mode} | model calls {report.model_calls} | planner tokens "
-        f"{report.planner_input_tokens}/{report.planner_output_tokens}"
+        f"{report.planner_input_tokens}/{report.planner_output_tokens} | revised "
+        f"{report.revised_answers} | withheld by verification {report.verification_abstentions} "
+        f"| verifier tokens {report.verifier_input_tokens}/{report.verifier_output_tokens}"
     )
     print(
         f"errors: answer {report.answer_errors}, judge {report.judge_errors} | tokens: answer "
@@ -160,7 +162,6 @@ async def main() -> int:
             max_sub_questions=settings.workflow_max_sub_questions,
             k_per_question=settings.answer_top_k,
             max_evidence=settings.workflow_max_evidence,
-            max_steps=settings.workflow_max_sub_questions + 2,
             timeout_seconds=settings.workflow_timeout_seconds,
         )
         modes = AnswerModes(
