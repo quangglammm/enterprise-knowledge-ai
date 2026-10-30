@@ -10,7 +10,7 @@ from enterprise_knowledge.domain.access import Principal
 from enterprise_knowledge.domain.errors import DocumentNotFoundError
 from enterprise_knowledge.domain.ids import DocumentId
 from enterprise_knowledge.domain.ports import BlobStore, DocumentRepository
-from enterprise_knowledge.ingestion.ingest import blob_key
+from enterprise_knowledge.ingestion.indexing import blob_key
 
 logger = logging.getLogger(__name__)
 

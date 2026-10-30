@@ -6,7 +6,7 @@ queue (JOB-01) without changing this logic.
 
 import asyncio
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict
@@ -15,22 +15,17 @@ from enterprise_knowledge.domain.access import AccessPolicy
 from enterprise_knowledge.domain.documents import (
     ContentType,
     Document,
-    DocumentChunk,
     DocumentStatus,
-    Embedding,
 )
-from enterprise_knowledge.domain.errors import DocumentNotFoundError
-from enterprise_knowledge.domain.ids import DocumentId, TenantId, new_document_id
+from enterprise_knowledge.domain.ids import DocumentId, new_document_id
 from enterprise_knowledge.domain.ports import BlobStore, DocumentRepository, Embedder
 from enterprise_knowledge.ingestion.chunking import ChunkingSettings, build_chunks
+from enterprise_knowledge.ingestion.indexing import blob_key, embed_chunks, next_version
 from enterprise_knowledge.ingestion.limits import IngestionLimits
 from enterprise_knowledge.ingestion.prepare import PreparedDocument, prepare_document
 
 logger = logging.getLogger(__name__)
 
-EMBED_BATCH_SIZE = 32
-# "Title > Section" header for embedding input; U+203A reads naturally in both languages.
-HEADER_SEPARATOR = " \u203a "
 _UNCATEGORIZED_FAILURE = "indexing_error"
 
 
@@ -40,17 +35,6 @@ class IngestResult(BaseModel):
     document: Document
     chunk_count: int
     duplicate: bool
-
-
-def embedding_input(title: str, section: str | None, text: str) -> str:
-    """Contextual header for the embedder (ADR-0006); stored chunk text stays unchanged."""
-    header = f"{title}{HEADER_SEPARATOR}{section}" if section and section != title else title
-    return f"{header}\n\n{text}"
-
-
-def blob_key(tenant_id: TenantId, document_id: DocumentId, version: int) -> str:
-    """Where a version's original upload is stored. Versions are numbered 1..N."""
-    return f"{tenant_id}/{document_id}/v{version}"
 
 
 class IngestDocument:
@@ -115,7 +99,9 @@ class IngestDocument:
                 data,
                 content_type=document.content_type,
             )
-            embeddings = await self._embed(document, chunks)
+            embeddings = await embed_chunks(
+                self._embedder, document, chunks, embedding_header=self._embedding_header
+            )
             await self._documents.replace_chunks(document, chunks, embeddings)
             indexed = document.with_status(DocumentStatus.INDEXED, now=self._clock())
             await self._documents.update_document(indexed)
@@ -155,15 +141,8 @@ class IngestDocument:
         document_id: DocumentId | None,
         title: str | None,
     ) -> Document:
-        version = 1
-        if document_id is None:
-            document_id = self._new_id()
-        else:
-            current = await self._documents.get_document(access.tenant_id, document_id)
-            # A deleted document stays deleted (ADR-0008); re-upload creates a new one.
-            if current is None or current.status is DocumentStatus.DELETED:
-                raise DocumentNotFoundError(f"document {document_id} not found")
-            version = current.version + 1
+        version = await next_version(self._documents, access.tenant_id, document_id)
+        document_id = document_id or self._new_id()
 
         now = self._clock()
         document = Document(
@@ -181,26 +160,3 @@ class IngestDocument:
         )
         await self._documents.add_document(document)
         return document
-
-    async def _embed(self, document: Document, chunks: Sequence[DocumentChunk]) -> list[Embedding]:
-        embeddings: list[Embedding] = []
-        for start in range(0, len(chunks), EMBED_BATCH_SIZE):
-            batch = chunks[start : start + EMBED_BATCH_SIZE]
-            vectors = await self._embedder.embed_documents(
-                [
-                    embedding_input(document.title, c.source.section, c.text)
-                    if self._embedding_header
-                    else c.text
-                    for c in batch
-                ]
-            )
-            embeddings.extend(
-                Embedding(
-                    chunk_id=chunk.id,
-                    model=self._embedder.model,
-                    dimension=self._embedder.dimension,
-                    vector=vector,
-                )
-                for chunk, vector in zip(batch, vectors, strict=True)
-            )
-        return embeddings

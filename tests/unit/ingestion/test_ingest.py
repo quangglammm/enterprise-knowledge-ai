@@ -6,12 +6,8 @@ from enterprise_knowledge.domain.documents import DocumentStatus
 from enterprise_knowledge.domain.errors import DocumentNotFoundError, ModelRateLimitedError
 from enterprise_knowledge.domain.ids import DocumentId
 from enterprise_knowledge.ingestion.errors import CorruptDocumentError
-from enterprise_knowledge.ingestion.ingest import (
-    HEADER_SEPARATOR,
-    IngestDocument,
-    blob_key,
-    embedding_input,
-)
+from enterprise_knowledge.ingestion.indexing import HEADER_SEPARATOR, blob_key, embedding_input
+from enterprise_knowledge.ingestion.ingest import IngestDocument
 from tests.factories import TENANT, make_policy, make_principal
 from tests.unit.ingestion.conftest import Harness, fixture_bytes
 
