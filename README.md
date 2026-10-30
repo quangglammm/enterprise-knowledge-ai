@@ -44,6 +44,7 @@ curl -i http://localhost:8000/health/ready
 | Retrieval benchmark | `uv run python scripts/run_benchmark.py --database-url postgresql://eka:eka@localhost:5432/eka_test` (wipes that database; add `--embedding fpt` for real retrieval, paid) |
 | Retrieval experiment | `uv run python scripts/run_benchmark.py --database-url ... --experiment experiments/week4/packed-1200.toml` (add `--embedding hashing` for a free dry run) |
 | Compare reports | `uv run python scripts/compare_reports.py <baseline.json> <candidate.json> ...` |
+| Judge calibration | `uv run python scripts/judge_calibration.py` (paid FPT calls; EVAL-02 judge agreement on hand-labelled cases) |
 | Add a dependency | `uv add <pkg>` (dev: `uv add --dev <pkg>`) |
 
 CI runs the same checks on every pull request (`.github/workflows/ci.yml`).
@@ -137,6 +138,7 @@ datasets/
   benchmark/v2/   115 labelled retrieval questions (ADR-0012); the scripts default to v2
   benchmark/v2-packed*/  the same questions labelled under section packing (ADR-0013)
   model_trial/    versioned grounded-answer cases for the ADR-0004 model trial
+  judge_calibration/  hand-labelled cases for the EVAL-02 answer-quality judge (ADR-0015)
 experiments/      versioned retrieval experiment configurations (ADR-0013)
 scripts/          fixtures, benchmark builder, runner and report comparison, chunk viewer, FPT smoke test, model trial
 docs/
@@ -178,6 +180,7 @@ More packages (`agents`, `worker`) are added when their first feature lands, rat
 - [ADR-0012: Benchmark v2: superset corpus with hard distractors and public documents](docs/adr/0012-benchmark-v2.md)
 - [ADR-0013: Retrieval experiments: versioned configurations and derived label sets](docs/adr/0013-retrieval-experiments.md)
 - [ADR-0014: Hybrid retrieval: IDF-weighted full-text search fused with vectors by RRF](docs/adr/0014-hybrid-retrieval.md)
+- [ADR-0015: Answer-quality evaluation with a calibrated LLM judge](docs/adr/0015-answer-quality-evaluation.md)
 
 ## Data
 

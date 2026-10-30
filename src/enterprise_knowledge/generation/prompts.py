@@ -42,8 +42,10 @@ def evidence_label(index: int) -> str:
 def answer_messages(
     question: str, evidence: Sequence[RetrievedEvidence]
 ) -> tuple[ChatMessage, ChatMessage]:
-    blocks = [_evidence_block(evidence_label(i), item) for i, item in enumerate(evidence)]
-    user = "\n\n".join([_EVIDENCE_INTRO, *blocks, f"<question>\n{_escape(question)}\n</question>"])
+    blocks = [evidence_block(evidence_label(i), item) for i, item in enumerate(evidence)]
+    user = "\n\n".join(
+        [_EVIDENCE_INTRO, *blocks, f"<question>\n{escape_markup(question)}\n</question>"]
+    )
     return (
         ChatMessage(role="system", content=SYSTEM_PROMPT),
         ChatMessage(role="user", content=user),
@@ -62,16 +64,17 @@ def repair_message(problem: str, *, evidence_count: int) -> ChatMessage:
     )
 
 
-def _evidence_block(label: str, item: RetrievedEvidence) -> str:
-    attributes = [f'label="{label}"', f'title="{_escape(item.title)}"']
+def evidence_block(label: str, item: RetrievedEvidence) -> str:
+    """One labelled, escaped evidence block; shared with the evaluation judge (ADR-0015)."""
+    attributes = [f'label="{label}"', f'title="{escape_markup(item.title)}"']
     if item.source.section:
-        attributes.append(f'section="{_escape(item.source.section)}"')
+        attributes.append(f'section="{escape_markup(item.source.section)}"')
     if item.source.page is not None:
         attributes.append(f'page="{item.source.page}"')
-    return f"<evidence {' '.join(attributes)}>\n{_escape(item.text)}\n</evidence>"
+    return f"<evidence {' '.join(attributes)}>\n{escape_markup(item.text)}\n</evidence>"
 
 
-def _escape(text: str) -> str:
+def escape_markup(text: str) -> str:
     return (
         text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
     )
