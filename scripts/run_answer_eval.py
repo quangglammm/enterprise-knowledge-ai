@@ -2,6 +2,7 @@
 
     uv run python scripts/run_answer_eval.py --database-url postgresql://eka:eka@localhost:5432/eka_test
     uv run python scripts/run_answer_eval.py --database-url ... --limit 5    # a cheap smoke run
+    uv run python scripts/run_answer_eval.py --database-url ... --mode workflow  # ADR-0017
 
 Migrates and WIPES the given database, indexes the corpus through the production ingestion
 path, then answers every benchmark question through the production ``AnswerQuestion`` path
@@ -21,7 +22,10 @@ from pathlib import Path
 
 from run_benchmark import REPORTS_DIR, code_revision
 
+from enterprise_knowledge.agents.modes import AnswerModes, ModeAnswer
+from enterprise_knowledge.agents.workflow import AnswerWorkflow, WorkflowLimits
 from enterprise_knowledge.config import get_settings
+from enterprise_knowledge.domain.access import Principal
 from enterprise_knowledge.evaluation.answer_quality import (
     AnswerQualityReport,
     AnswerRunSettings,
@@ -54,6 +58,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--corpus", default="v2", help="datasets/corpus/<name>")
     parser.add_argument("--benchmark", default="v2", help="datasets/benchmark/<name>")
     parser.add_argument("--judge-model", help="default: EKA_LLM_MODEL")
+    parser.add_argument("--mode", choices=["direct", "workflow"], default="direct")
     parser.add_argument("--limit", type=int, help="only the first N questions (smoke run)")
     parser.add_argument("--out", type=Path, help="report path (default: docs/evaluation/...)")
     parser.add_argument("--answers-out", type=Path, help="also write answer texts here")
@@ -86,6 +91,10 @@ def print_report(report: AnswerQualityReport) -> None:
                 f"{question_type.value + f' ({row.questions})':22}{pct(row.correct_rate)}   "
                 f"{pct(row.faithfulness_rate)}"
             )
+    print(
+        f"mode {report.settings.mode} | model calls {report.model_calls} | planner tokens "
+        f"{report.planner_input_tokens}/{report.planner_output_tokens}"
+    )
     print(
         f"errors: answer {report.answer_errors}, judge {report.judge_errors} | tokens: answer "
         f"{report.answer_input_tokens}/{report.answer_output_tokens}, judge "
@@ -145,15 +154,31 @@ async def main() -> int:
                 blobs=LocalBlobStore(Path(blob_dir)),
                 chunking=dataset.chunking,
             )
-        answer = AnswerQuestion(
-            search=SearchKnowledge(search=store, embedder=embedder, retrieval=retrieval),
-            chat=FptChatModel(
-                chat_client, model=settings.llm_model, json_mode=settings.llm_json_mode
-            ),
-            k=settings.answer_top_k,
-            min_score=settings.answer_min_score,
-            timeout_seconds=settings.answer_timeout_seconds,
+        search = SearchKnowledge(search=store, embedder=embedder, retrieval=retrieval)
+        chat = FptChatModel(chat_client, model=settings.llm_model, json_mode=settings.llm_json_mode)
+        limits = WorkflowLimits(
+            max_sub_questions=settings.workflow_max_sub_questions,
+            k_per_question=settings.answer_top_k,
+            max_evidence=settings.workflow_max_evidence,
+            max_steps=settings.workflow_max_sub_questions + 2,
+            timeout_seconds=settings.workflow_timeout_seconds,
         )
+        modes = AnswerModes(
+            direct=AnswerQuestion(
+                search=search,
+                chat=chat,
+                k=settings.answer_top_k,
+                min_score=settings.answer_min_score,
+                timeout_seconds=settings.answer_timeout_seconds,
+            ),
+            workflow=AnswerWorkflow(
+                search=search, chat=chat, limits=limits, min_score=settings.answer_min_score
+            ),
+        )
+
+        async def answer(principal: Principal, question: str) -> ModeAnswer:
+            return await modes(principal, question, mode=args.mode)
+
         judge = AnswerJudge(
             chat=FptChatModel(
                 chat_client,
@@ -172,6 +197,8 @@ async def main() -> int:
                 k=settings.answer_top_k,
                 min_score=settings.answer_min_score,
                 embedding_model=embedder.model,
+                mode=args.mode,
+                workflow=limits if args.mode == "workflow" else None,
             ),
             code_revision=code_revision(),
             keep_text=args.answers_out is not None,
@@ -184,7 +211,8 @@ async def main() -> int:
     print_report(report)
     suffix = f"-limit{args.limit}" if args.limit else ""
     out = args.out or ROOT / REPORTS_DIR / (
-        f"answer-quality-{report.dataset_version}{suffix}-{datetime.now(UTC):%Y%m%d-%H%M%S}.json"
+        f"answer-quality-{report.dataset_version}-{args.mode}{suffix}-"
+        f"{datetime.now(UTC):%Y%m%d-%H%M%S}.json"
     )
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(report.model_dump_json(indent=2, exclude={"outcomes": {"__all__": {"answer"}}}))

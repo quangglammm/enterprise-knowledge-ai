@@ -12,6 +12,8 @@ from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontext
 from fastapi import FastAPI
 
 from enterprise_knowledge import __version__
+from enterprise_knowledge.agents.modes import AnswerModes
+from enterprise_knowledge.agents.workflow import AnswerWorkflow, WorkflowLimits
 from enterprise_knowledge.api import health
 from enterprise_knowledge.api.errors import install_error_handlers
 from enterprise_knowledge.api.health import ReadinessCheck
@@ -113,12 +115,26 @@ def build_services(
     )
     answer = None
     if chat is not None:
-        answer = AnswerQuestion(
-            search=search,
-            chat=chat,
-            k=settings.answer_top_k,
-            min_score=settings.answer_min_score,
-            timeout_seconds=settings.answer_timeout_seconds,
+        answer = AnswerModes(
+            direct=AnswerQuestion(
+                search=search,
+                chat=chat,
+                k=settings.answer_top_k,
+                min_score=settings.answer_min_score,
+                timeout_seconds=settings.answer_timeout_seconds,
+            ),
+            workflow=AnswerWorkflow(
+                search=search,
+                chat=chat,
+                limits=WorkflowLimits(
+                    max_sub_questions=settings.workflow_max_sub_questions,
+                    k_per_question=settings.answer_top_k,
+                    max_evidence=settings.workflow_max_evidence,
+                    max_steps=settings.workflow_max_sub_questions + 2,
+                    timeout_seconds=settings.workflow_timeout_seconds,
+                ),
+                min_score=settings.answer_min_score,
+            ),
         )
     return Services(
         documents=store,
@@ -135,4 +151,5 @@ def build_services(
         search=search,
         max_upload_bytes=settings.max_upload_bytes,
         answer=answer,
+        default_answer_mode=settings.answer_mode,
     )

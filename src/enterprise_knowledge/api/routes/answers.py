@@ -1,16 +1,21 @@
-"""/v1/answers: grounded answers with validated citations (RAG-02)."""
+"""/v1/answers: grounded answers with validated citations (RAG-02).
+
+``mode`` picks standard RAG (``direct``) or the bounded plan -> retrieve -> answer
+``workflow`` (AGENT-01, ADR-0017); without it, ``EKA_ANSWER_MODE`` decides. Both modes
+return the same shape, with the steps and model calls they used, so they can be compared.
+"""
 
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from enterprise_knowledge.agents.modes import AnswerMode, ModeAnswer
 from enterprise_knowledge.api.errors import ServiceUnavailableError
 from enterprise_knowledge.api.identity import current_principal
 from enterprise_knowledge.api.services import Services, get_services
 from enterprise_knowledge.domain.access import Principal
 from enterprise_knowledge.domain.retrieval import RetrievedEvidence
-from enterprise_knowledge.generation.answer import AnswerResult
 from enterprise_knowledge.generation.prompts import evidence_label
 
 router = APIRouter(prefix="/v1", tags=["answers"])
@@ -25,6 +30,12 @@ _ERRORS: dict[int | str, dict[str, Any]] = {
 
 class AnswerIn(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
+    mode: AnswerMode | None = None  # default: EKA_ANSWER_MODE
+
+
+class UsageOut(BaseModel):
+    steps: int
+    model_calls: int
 
 
 class CitationOut(BaseModel):
@@ -62,9 +73,15 @@ class AnswerOut(BaseModel):
     citations: list[CitationOut]
     model_id: str | None
     prompt_version: str
+    mode: AnswerMode
+    # Parts the workflow searched separately; empty in direct mode. They are derived from
+    # the question only, never from documents.
+    sub_questions: list[str]
+    usage: UsageOut
 
     @classmethod
-    def of(cls, result: AnswerResult) -> "AnswerOut":
+    def of(cls, answered: ModeAnswer) -> "AnswerOut":
+        result = answered.answer
         labelled = {
             item.chunk_id: (evidence_label(i), item) for i, item in enumerate(result.evidence)
         }
@@ -76,6 +93,9 @@ class AnswerOut(BaseModel):
             citations=[CitationOut.of(*labelled[c.chunk_id]) for c in response.citations],
             model_id=result.model_id,
             prompt_version=result.prompt_version,
+            mode=answered.mode,
+            sub_questions=list(answered.sub_questions),
+            usage=UsageOut(steps=answered.steps, model_calls=answered.model_calls),
         )
 
 
@@ -86,4 +106,5 @@ async def answer_question(
     """Answer from evidence the caller may read, or abstain. Model failures are 502/504."""
     if services.answer is None:
         raise ServiceUnavailableError("answer generation is not configured")
-    return AnswerOut.of(await services.answer(principal, body.question))
+    mode = body.mode or services.default_answer_mode
+    return AnswerOut.of(await services.answer(principal, body.question, mode=mode))

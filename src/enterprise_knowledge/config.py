@@ -83,6 +83,15 @@ class Settings(BaseSettings):
     job_visibility_seconds: float = Field(default=300.0, ge=30)
     worker_wait_seconds: float = Field(default=10.0, ge=0)
 
+    # How /v1/answers answers when a request names no mode (AGENT-01, ADR-0017): "direct"
+    # RAG, or the bounded plan -> retrieve -> answer "workflow". The workflow searches each
+    # of up to workflow_max_sub_questions parts with answer_top_k, keeps at most
+    # workflow_max_evidence chunks, and must finish within workflow_timeout_seconds.
+    answer_mode: Literal["direct", "workflow"] = "direct"
+    workflow_max_sub_questions: int = Field(default=3, ge=1, le=5)
+    workflow_max_evidence: int = Field(default=8, ge=1, le=20)
+    workflow_timeout_seconds: float = Field(default=60.0, gt=0)
+
     answer_top_k: int = Field(default=5, ge=1, le=20)
     # Evidence scoring below this is not sent to the model; None disables the gate until
     # Week 4 calibrates it on the benchmark.

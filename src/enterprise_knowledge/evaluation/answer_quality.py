@@ -18,6 +18,8 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from enterprise_knowledge.agents.modes import ModeAnswer
+from enterprise_knowledge.agents.workflow import WorkflowLimits
 from enterprise_knowledge.domain.access import Principal
 from enterprise_knowledge.domain.answers import AnswerStatus
 from enterprise_knowledge.domain.errors import DomainError
@@ -33,12 +35,12 @@ from enterprise_knowledge.evaluation.judge import (
     CorrectnessJudgment,
     GroundingJudgment,
 )
-from enterprise_knowledge.generation.answer import AnswerResult
 from enterprise_knowledge.generation.prompts import PROMPT_VERSION, evidence_label
 from enterprise_knowledge.ingestion.chunking import ChunkingSettings
 from enterprise_knowledge.retrieval.search import RetrievalSettings
 
-Answerer = Callable[[Principal, str], Awaitable[AnswerResult]]
+# AnswerModes bound to one mode: direct RAG or the workflow (ADR-0017).
+Answerer = Callable[[Principal, str], Awaitable[ModeAnswer]]
 
 
 class AnswerRunSettings(BaseModel):
@@ -50,6 +52,8 @@ class AnswerRunSettings(BaseModel):
     k: int
     min_score: float | None
     embedding_model: str
+    mode: str = "direct"
+    workflow: WorkflowLimits | None = None  # set for workflow runs
 
 
 class AnswerOutcome(BaseModel):
@@ -73,8 +77,14 @@ class AnswerOutcome(BaseModel):
     judge_error_category: str | None = None
     answer_model: str | None = None
     judge_model: str | None = None
+    mode: str | None = None
+    sub_questions: int | None = None  # workflow runs only
+    steps: int | None = None
+    model_calls: int | None = None  # answer-side calls, the planner included
     answer_input_tokens: int = 0
     answer_output_tokens: int = 0
+    planner_input_tokens: int = 0
+    planner_output_tokens: int = 0
     judge_input_tokens: int = 0
     judge_output_tokens: int = 0
     answer: str | None = None  # only with keep_text
@@ -115,8 +125,11 @@ class AnswerQualityReport(BaseModel):
     gold_citation_rate: float | None  # answered answerable questions citing a gold chunk
     retrieval_gold_rate: float | None  # answerable questions with a gold chunk retrieved
     by_type: dict[QuestionType, TypeQuality]
+    model_calls: int
     answer_input_tokens: int
     answer_output_tokens: int
+    planner_input_tokens: int
+    planner_output_tokens: int
     judge_input_tokens: int
     judge_output_tokens: int
     outcomes: list[AnswerOutcome]
@@ -164,8 +177,11 @@ async def evaluate_answers(
         gold_citation_rate=_rate(o.cites_gold for o in answered if o.answerable),
         retrieval_gold_rate=_rate(o.retrieved_gold for o in answerable),
         by_type={t: _by_type([o for o in outcomes if t in o.types]) for t in QuestionType},
+        model_calls=sum(o.model_calls or 0 for o in outcomes),
         answer_input_tokens=sum(o.answer_input_tokens for o in outcomes),
         answer_output_tokens=sum(o.answer_output_tokens for o in outcomes),
+        planner_input_tokens=sum(o.planner_input_tokens for o in outcomes),
+        planner_output_tokens=sum(o.planner_output_tokens for o in outcomes),
         judge_input_tokens=sum(o.judge_input_tokens for o in outcomes),
         judge_output_tokens=sum(o.judge_output_tokens for o in outcomes),
         outcomes=outcomes,
@@ -177,10 +193,11 @@ async def _evaluate(
 ) -> AnswerOutcome:
     base = {"question_id": question.id, "types": question.types, "answerable": question.answerable}
     try:
-        result = await answer(question.principal.principal(), question.question)
+        answered = await answer(question.principal.principal(), question.question)
     except DomainError as exc:  # recorded; the run goes on
         return AnswerOutcome(**base, error_category=exc.category)
 
+    result = answered.answer
     response = result.response
     is_answer = response.status is AnswerStatus.ANSWERED
     gold = {chunk for group in question.groups() for chunk in group}
@@ -192,6 +209,12 @@ async def _evaluate(
         "answer_model": result.model_id,
         "answer_input_tokens": result.input_tokens,
         "answer_output_tokens": result.output_tokens,
+        "mode": answered.mode,
+        "sub_questions": len(answered.sub_questions) if answered.mode == "workflow" else None,
+        "steps": answered.steps,
+        "model_calls": answered.model_calls,
+        "planner_input_tokens": answered.planner_input_tokens,
+        "planner_output_tokens": answered.planner_output_tokens,
     }
     if question.answerable:
         fields["retrieved_gold"] = any(item.chunk_id in gold for item in result.evidence)

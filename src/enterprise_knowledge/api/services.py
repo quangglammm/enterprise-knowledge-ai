@@ -4,9 +4,9 @@ from dataclasses import dataclass
 
 from fastapi import Request
 
+from enterprise_knowledge.agents.modes import AnswerMode, AnswerModes
 from enterprise_knowledge.api.errors import ServiceUnavailableError
 from enterprise_knowledge.domain.ports import DocumentRepository, JobRepository
-from enterprise_knowledge.generation.answer import AnswerQuestion
 from enterprise_knowledge.ingestion.delete import DeleteDocument
 from enterprise_knowledge.ingestion.jobs import SubmitDocument
 from enterprise_knowledge.retrieval.search import SearchKnowledge
@@ -22,7 +22,8 @@ class Services:
     search: SearchKnowledge
     max_upload_bytes: int
     # None until a chat model adapter is configured; /v1/answers then returns 503.
-    answer: AnswerQuestion | None = None
+    answer: AnswerModes | None = None
+    default_answer_mode: AnswerMode = "direct"
 
 
 def get_services(request: Request) -> Services:

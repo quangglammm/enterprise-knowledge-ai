@@ -6,6 +6,8 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from enterprise_knowledge.agents.modes import AnswerModes
+from enterprise_knowledge.agents.workflow import AnswerWorkflow, WorkflowLimits
 from enterprise_knowledge.api.app import create_app
 from enterprise_knowledge.domain.errors import (
     ModelAuthenticationError,
@@ -31,8 +33,12 @@ class Client:
 
     def __init__(self, *script: str | Exception) -> None:
         services, drain = make_services(InMemoryDocumentStore())
-        answer = AnswerQuestion(
-            search=services.search, chat=ScriptedChatModel(script), timeout_seconds=0.05
+        self.chat = ScriptedChatModel(script)
+        answer = AnswerModes(
+            direct=AnswerQuestion(search=services.search, chat=self.chat, timeout_seconds=0.05),
+            workflow=AnswerWorkflow(
+                search=services.search, chat=self.chat, limits=WorkflowLimits(timeout_seconds=1.0)
+            ),
         )
         services = dataclasses.replace(services, answer=answer)
         app = create_app(make_settings(), services=services)
@@ -135,3 +141,50 @@ def test_provider_failures_map_to_upstream_errors(
 
     assert response.status_code == status
     assert response.json()["error"]["category"] == category
+
+
+def test_mode_defaults_to_direct_and_reports_usage() -> None:
+    client = Client(answered("E1"))
+    with client.http as http:
+        upload(http, STAFF)
+
+        body = http.post("/v1/answers", headers=STAFF, json=QUESTION).json()
+
+    assert body["mode"] == "direct"
+    assert body["sub_questions"] == []
+    assert body["usage"] == {"steps": 2, "model_calls": 1}
+    assert len(client.chat.requests) == 1
+
+
+def test_workflow_mode_returns_its_sub_questions() -> None:
+    plan = json.dumps({"sub_questions": ["Số ngày phép năm?", "Ngày phép chuyển sang năm sau?"]})
+    client = Client(plan, answered("E1"))
+    with client.http as http:
+        upload(http, STAFF)
+
+        response = http.post("/v1/answers", headers=STAFF, json=QUESTION | {"mode": "workflow"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "workflow"
+    assert body["sub_questions"] == ["Số ngày phép năm?", "Ngày phép chuyển sang năm sau?"]
+    assert body["usage"] == {"steps": 4, "model_calls": 2}
+    assert body["status"] == "answered"
+
+
+def test_unknown_mode_is_422() -> None:
+    with Client().http as http:
+        response = http.post("/v1/answers", headers=STAFF, json=QUESTION | {"mode": "agentic"})
+
+    assert response.status_code == 422
+    assert response.json()["error"]["category"] == "invalid_request"
+
+
+def test_workflow_timeout_is_504() -> None:
+    client = Client(json.dumps({"sub_questions": ["x"]}))
+    client.chat.delay_seconds = 2.0  # beyond the 1 s workflow deadline
+    with client.http as http:
+        response = http.post("/v1/answers", headers=STAFF, json=QUESTION | {"mode": "workflow"})
+
+    assert response.status_code == 504
+    assert response.json()["error"]["category"] == "workflow_timeout"

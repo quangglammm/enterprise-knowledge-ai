@@ -147,3 +147,21 @@ def test_job_settings_have_bounded_retry_defaults() -> None:
 def test_invalid_job_settings_fail_clearly(values: dict[str, object]) -> None:
     with pytest.raises(ValidationError, match="job_"):
         settings(**values)
+
+
+def test_answer_mode_defaults_to_direct_with_bounded_workflow_settings() -> None:
+    defaults = settings()
+
+    assert defaults.answer_mode == "direct"
+    assert (defaults.workflow_max_sub_questions, defaults.workflow_max_evidence) == (3, 8)
+    assert defaults.workflow_timeout_seconds == 60.0
+
+
+@pytest.mark.parametrize(
+    "values",
+    [{"answer_mode": "auto"}, {"workflow_max_sub_questions": 6}, {"workflow_timeout_seconds": 0}],
+    ids=["unknown-mode", "too-many-parts", "no-time"],
+)
+def test_invalid_answer_mode_settings_fail_clearly(values: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        settings(**values)

@@ -12,6 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from enterprise_knowledge.agents.errors import WorkflowError, WorkflowTimeoutError
 from enterprise_knowledge.domain.errors import (
     AccessViolationError,
     DocumentAlreadyExistsError,
@@ -66,6 +67,8 @@ _DOMAIN_STATUS: list[tuple[type[DomainError], int]] = [
     (DocumentAlreadyExistsError, status.HTTP_409_CONFLICT),
     # The model, not the request, failed (ADR-0009). Never reported as an abstention.
     (ModelTimeoutError, status.HTTP_504_GATEWAY_TIMEOUT),
+    (WorkflowTimeoutError, status.HTTP_504_GATEWAY_TIMEOUT),
+    (WorkflowError, status.HTTP_502_BAD_GATEWAY),
     (GenerationError, status.HTTP_502_BAD_GATEWAY),
     # Provider throttling outlasted our retries: the client may try again later (ADR-0010).
     (ModelRateLimitedError, status.HTTP_503_SERVICE_UNAVAILABLE),

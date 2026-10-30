@@ -91,7 +91,7 @@ Tests and CI never call a model provider.
 | `GET /v1/documents/{id}/chunks` | Chunks of the current (or `?version=`) version, with page, section and character offsets. Superseded versions have no chunks (ADR-0008). |
 | `DELETE /v1/documents/{id}` | Remove every version from search and storage. `204`, also when already deleted. |
 | `POST /v1/search` | `{"query": "...", "k": 5}` returns access-checked evidence, ranked by vector similarity or, with `EKA_RETRIEVAL_MODE=hybrid`, by vector plus full-text search (ADR-0014). |
-| `POST /v1/answers` | `{"question": "..."}` returns an answer with validated citations, or `status: insufficient_evidence`. Model failures are `502`/`504`. Provider failures are `502`, or `503` when throttled. Returns `503` when no chat model is configured (`EKA_LLM_API_KEY`). |
+| `POST /v1/answers` | `{"question": "...", "mode": "direct" \| "workflow"}` returns an answer with validated citations, or `status: insufficient_evidence`, plus `mode`, `sub_questions` and `usage` (steps, model calls). `workflow` plans up to 3 sub-questions, searches each and answers once (ADR-0017); without `mode`, `EKA_ANSWER_MODE` (default `direct`) decides. Model failures are `502`/`504`. Provider failures are `502`, or `503` when throttled. Returns `503` when no chat model is configured (`EKA_LLM_API_KEY`). |
 
 Interactive docs are at `/docs` when the API runs.
 
@@ -124,6 +124,7 @@ src/enterprise_knowledge/
   generation/     AnswerQuestion and GenerateAnswer use cases, versioned prompt, answer parsing and citation checks
   evaluation/     retrieval benchmark and experiments, answer-quality judge, model trial scoring
   infrastructure/ adapters: Postgres store, vector and full-text search, job store and queue, migrations, blob store, FPT chat and embeddings, dev embedder
+  agents/         bounded plan -> retrieve -> answer workflow and answer modes (ADR-0017)
   api/            HTTP layer only (routes, middleware, app factory)
   worker/         ingestion worker process (eka-worker): poll loop, backoff, graceful shutdown
   observability/  structured logging, later tracing and metrics
@@ -186,6 +187,7 @@ More packages (`agents`, `worker`) are added when their first feature lands, rat
 - [ADR-0014: Hybrid retrieval: IDF-weighted full-text search fused with vectors by RRF](docs/adr/0014-hybrid-retrieval.md)
 - [ADR-0015: Answer-quality evaluation with a calibrated LLM judge](docs/adr/0015-answer-quality-evaluation.md)
 - [ADR-0016: Asynchronous ingestion with a Postgres job queue](docs/adr/0016-asynchronous-ingestion.md)
+- [ADR-0017: A bounded plan–retrieve–answer workflow, chosen per request](docs/adr/0017-bounded-answer-workflow.md)
 
 ## Data
 

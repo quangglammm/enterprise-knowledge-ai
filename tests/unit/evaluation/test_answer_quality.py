@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from enterprise_knowledge.agents.modes import ModeAnswer
 from enterprise_knowledge.domain.access import Principal
 from enterprise_knowledge.domain.answers import AnswerResponse, AnswerStatus, Citation
 from enterprise_knowledge.domain.ids import ChunkId, DocumentId, chunk_id_for
@@ -77,18 +78,20 @@ def abstained() -> AnswerResult:
 
 
 class ScriptedAnswerer:
-    """Returns one scripted result (or raises) per call, in order."""
+    """Returns one scripted result (or raises) per call, in order, as direct RAG would."""
 
-    def __init__(self, *script: AnswerResult | Exception) -> None:
+    def __init__(self, *script: AnswerResult | ModeAnswer | Exception) -> None:
         self._script = list(script)
         self.questions: list[str] = []
 
-    async def __call__(self, principal: Principal, text: str) -> AnswerResult:
+    async def __call__(self, principal: Principal, text: str) -> ModeAnswer:
         self.questions.append(text)
         step = self._script.pop(0)
         if isinstance(step, Exception):
             raise step
-        return step
+        if isinstance(step, ModeAnswer):
+            return step
+        return ModeAnswer(mode="direct", answer=step, steps=2, model_calls=1)
 
 
 def judge(*replies: dict[str, Any]) -> tuple[AnswerJudge, ScriptedChatModel]:
@@ -226,3 +229,33 @@ async def test_report_records_every_version_and_no_text_by_default() -> None:
     assert report.answer_input_tokens == 100
     assert report.judge_input_tokens > 0
     assert "14 days [E2]" not in report.model_dump_json()
+
+
+async def test_workflow_usage_is_recorded_for_comparison_with_direct() -> None:
+    answer_judge, _ = judge(CORRECT, GROUNDED)
+    workflow_answer = ModeAnswer(
+        mode="workflow",
+        answer=answered(GOLD),
+        sub_questions=("leave days?", "carry-over?"),
+        steps=4,
+        model_calls=2,
+        planner_input_tokens=40,
+        planner_output_tokens=12,
+    )
+
+    report = await evaluate_answers(
+        dataset(question("q001")), ScriptedAnswerer(workflow_answer), answer_judge, SETTINGS
+    )
+
+    [outcome] = report.outcomes
+    assert (outcome.mode, outcome.sub_questions, outcome.steps, outcome.model_calls) == (
+        "workflow",
+        2,
+        4,
+        2,
+    )
+    assert (report.model_calls, report.planner_input_tokens, report.planner_output_tokens) == (
+        2,
+        40,
+        12,
+    )
