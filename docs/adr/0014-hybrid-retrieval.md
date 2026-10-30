@@ -40,9 +40,18 @@ Fusion:
   - `ensure_accessible` still checks the fused result.
 - **Settings:** `EKA_RETRIEVAL_MODE`, `EKA_RRF_K` and `EKA_HYBRID_CANDIDATES`. `ExperimentConfig` records the same three (ADR-0013).
 
+## Results (2026-10-30)
+
+On benchmark v2 with FPT embeddings, hybrid scores 73.0% Recall@1 against vector's 86.5%: 0 questions improved, 24 worsened, and Recall@10 fell from 100% to 80.5%.
+
+- **Cause:** with `rrf_k` = 60 and 50 candidates, any chunk in both lists outranks every chunk found by only one.
+- **Contributing:** the lexical list is full for 91 of 115 questions (common-word matches) and finds cross-lingual answers in only 11 of 30 questions.
+
+Vector stays the default. Details are in `docs/evaluation/week4-retrieval-experiments.md`. Any re-tuning needs a development/test split of the questions first.
+
 ## Consequences
 
-- **Production default:** vector search stays the default until the benchmark shows hybrid helps. The result is recorded in the Week 4 write-up.
+- **Production default:** vector search stays the default; on benchmark v2, hybrid as configured is worse (see Results).
 - **Cost:** a hybrid search makes two queries. The lexical query scans the principal's visible chunks to count document frequencies, which is O(visible chunks × query terms). That is fine for the benchmark and a demo tenant. At scale, df would come from a maintained statistics table, or `pg_search` once the deployment target allows it.
 - **Fusion only reorders evidence:** both inputs are already filtered, so hybrid never weakens access control. The contract tests check lexical filtering on the fake and on Postgres, and the Postgres benchmark tests run in both modes.
 - **The fake approximates Postgres's tokenizer**, as `\w+(\.\w+)*` lowercased. A contract test that passes on one and fails on the other points to tokenizer drift.
