@@ -49,6 +49,27 @@ def test_defaults_are_the_production_settings() -> None:
 
     assert config.embedding_header
     assert config.k_values == (1, 3, 5, 10)
+    assert (config.retrieval, config.rrf_k, config.candidates) == ("vector", 60, 50)
+
+
+def test_hybrid_retrieval_settings_are_part_of_the_experiment() -> None:
+    config = ExperimentConfig.model_validate(
+        {
+            "name": "hybrid",
+            "corpus": "v2",
+            "benchmark": "v2",
+            "embedding": "fpt",
+            "retrieval": "hybrid",
+            "rrf_k": 30,
+            "candidates": 40,
+        }
+    )
+
+    assert config.retrieval_settings().model_dump() == {
+        "mode": "hybrid",
+        "rrf_k": 30,
+        "candidates": 40,
+    }
 
 
 def test_unknown_experiment_key_is_rejected(tmp_path: Path) -> None:

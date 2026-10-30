@@ -32,7 +32,7 @@ from enterprise_knowledge.ingestion.delete import DeleteDocument
 from enterprise_knowledge.ingestion.ingest import IngestDocument
 from enterprise_knowledge.ingestion.limits import IngestionLimits
 from enterprise_knowledge.observability.logging import configure_logging
-from enterprise_knowledge.retrieval.search import SearchKnowledge
+from enterprise_knowledge.retrieval.search import RetrievalSettings, SearchKnowledge
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,15 @@ def build_services(
 ) -> Services:
     """Wire use cases to adapters. Without a chat model, /v1/answers returns 503."""
     blobs = LocalBlobStore(settings.blob_dir)
-    search = SearchKnowledge(search=store, embedder=embedder)
+    search = SearchKnowledge(
+        search=store,
+        embedder=embedder,
+        retrieval=RetrievalSettings(
+            mode=settings.retrieval_mode,
+            rrf_k=settings.rrf_k,
+            candidates=settings.hybrid_candidates,
+        ),
+    )
     answer = None
     if chat is not None:
         answer = AnswerQuestion(

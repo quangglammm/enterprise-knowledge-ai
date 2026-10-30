@@ -25,8 +25,13 @@ def pct(value: float | None) -> str:
 def describe(report: BenchmarkReport) -> str:
     experiment = report.experiment
     name = experiment.name if experiment else report.dataset_version
-    header = "" if experiment is None or experiment.embedding_header else ", no header"
-    return f"{name} [{report.dataset_version}, {report.embedding_model}{header}]"
+    notes = []
+    if experiment is not None and not experiment.embedding_header:
+        notes.append("no header")
+    if experiment is not None and experiment.retrieval != "vector":
+        notes.append(experiment.retrieval)
+    extra = "".join(f", {note}" for note in notes)
+    return f"{name} [{report.dataset_version}, {report.embedding_model}{extra}]"
 
 
 def main() -> int:

@@ -1,0 +1,10 @@
+# Hybrid retrieval (ADR-0014): vector search fused with IDF-weighted full-text search by
+# reciprocal rank fusion, otherwise the production baseline.
+name = "hybrid"
+description = "Vector plus full-text search, RRF k=60 over the top 50 of each list."
+corpus = "v2"
+benchmark = "v2"
+embedding = "fpt"
+retrieval = "hybrid"
+rrf_k = 60
+candidates = 50

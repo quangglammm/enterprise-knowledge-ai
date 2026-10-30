@@ -88,6 +88,45 @@ JOIN documents d
 ORDER BY hits.distance, hits.id
 """).format(columns=_CHUNK_COLUMNS)
 
+# Full-text relevance (ADR-0014): the sum of BM25-style IDF over the query terms a chunk
+# contains, with N and document frequencies counted over the chunks this principal may
+# read. The same filters as vector search apply inside the query (ADR-0003).
+_LEXICAL_SQL = sql.SQL("""
+WITH terms AS MATERIALIZED (
+    SELECT DISTINCT lexeme
+    FROM unnest(tsvector_to_array(to_tsvector('simple', %(text)s))) AS lexeme
+),
+visible AS MATERIALIZED (
+    SELECT id, lexemes
+    FROM chunks
+    WHERE tenant_id = %(tenant)s
+      AND searchable
+      AND allowed_groups && %(groups)s::text[]
+      AND embedding_model = %(model)s
+),
+idf AS (
+    SELECT t.lexeme,
+           ln(1 + ((SELECT count(*) FROM visible) - count(*) + 0.5) / (count(*) + 0.5)) AS idf
+    FROM terms t
+    JOIN visible v ON v.lexemes @@ to_tsquery('simple', quote_literal(t.lexeme))
+    GROUP BY t.lexeme
+),
+scored AS (
+    SELECT v.id, sum(i.idf)::float8 AS relevance
+    FROM visible v
+    JOIN idf i ON v.lexemes @@ to_tsquery('simple', quote_literal(i.lexeme))
+    GROUP BY v.id
+    ORDER BY relevance DESC, v.id
+    LIMIT %(k)s
+)
+SELECT {columns}, c.embedding <=> %(query)s::vector AS distance, d.title
+FROM scored
+JOIN chunks c ON c.id = scored.id
+JOIN documents d
+  ON d.tenant_id = c.tenant_id AND d.id = c.document_id AND d.version = c.document_version
+ORDER BY scored.relevance DESC, c.id
+""").format(columns=sql.SQL(", ").join(sql.Identifier("c", f) for f in _CHUNK_FIELDS))
+
 # Chunks of versions older than the serving one are stale (ADR-0008). Without an indexed
 # version the comparison is NULL and nothing is pruned.
 _PRUNE_SUPERSEDED_SQL = """
@@ -258,9 +297,18 @@ class PostgresDocumentStore:
                 await insert.executemany(
                     "INSERT INTO chunks (id, tenant_id, document_id, document_version,"
                     " chunk_index, text, page, section, char_start, char_end, allowed_groups,"
-                    " language, embedding_model, embedding) VALUES (%s, %s, %s, %s, %s, %s,"
-                    " %s, %s, %s, %s, %s, %s, %s, %s::vector)",
-                    [_chunk_params(c, vectors[c.id]) for c in chunks],
+                    " language, embedding_model, embedding, lexemes) VALUES (%s, %s, %s, %s,"
+                    " %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::vector,"
+                    " to_tsvector('simple', concat_ws(' ', %s::text, %s::text, %s::text)))",
+                    [
+                        (
+                            *_chunk_params(c, vectors[c.id]),
+                            document.title,
+                            c.source.section,
+                            c.text,
+                        )
+                        for c in chunks
+                    ],
                 )
             await _apply_serving_rule(conn, document.tenant_id, document.id)
 
@@ -328,6 +376,32 @@ class PostgresDocumentStore:
             # Exact scan: correct under any filter, slower at scale (ADR-0007).
             await conn.execute("SET LOCAL enable_indexscan = off")
             rows = await _run_search(conn, params)
+        return [_evidence(row) for row in rows]
+
+    async def search_lexical(
+        self,
+        principal: Principal,
+        query_text: str,
+        query_vector: Vector,
+        *,
+        k: int,
+        embedding_model: str,
+    ) -> list[RetrievedEvidence]:
+        if k < 1:
+            raise ValueError("k must be at least 1")
+        if len(query_vector) != self._dimension:
+            raise ValueError(f"query dimension {len(query_vector)} != {self._dimension}")
+        params = {
+            "text": query_text,
+            "query": _vector_literal(query_vector),
+            "tenant": principal.tenant_id,
+            "groups": sorted(principal.groups),
+            "model": embedding_model,
+            "k": k,
+        }
+        async with self._pool.connection() as conn:
+            cur = await conn.cursor(row_factory=dict_row).execute(_LEXICAL_SQL, params)
+            rows = await cur.fetchall()
         return [_evidence(row) for row in rows]
 
 

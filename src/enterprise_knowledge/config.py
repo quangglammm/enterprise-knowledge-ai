@@ -67,6 +67,13 @@ class Settings(BaseSettings):
     # Attempts per model call, including the first; only transient failures are retried.
     model_max_attempts: int = Field(default=3, ge=1, le=6)
 
+    # Ranking for /v1/search and /v1/answers (ADR-0014): "vector" or "hybrid", which adds
+    # full-text search fused by reciprocal rank fusion with constant rrf_k over the top
+    # hybrid_candidates of each list. Recorded with every benchmark run (ADR-0013).
+    retrieval_mode: Literal["vector", "hybrid"] = "vector"
+    rrf_k: int = Field(default=60, ge=1)
+    hybrid_candidates: int = Field(default=50, ge=1, le=200)
+
     answer_top_k: int = Field(default=5, ge=1, le=20)
     # Evidence scoring below this is not sent to the model; None disables the gate until
     # Week 4 calibrates it on the benchmark.

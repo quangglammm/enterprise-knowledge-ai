@@ -183,7 +183,9 @@ async def main() -> int:
             )
         report = await run_retrieval_benchmark(
             dataset,
-            SearchKnowledge(search=store, embedder=embedder),
+            SearchKnowledge(
+                search=store, embedder=embedder, retrieval=experiment.retrieval_settings()
+            ),
             k_values=experiment.k_values,
             embedding_model=embedder.model,
             experiment=experiment,

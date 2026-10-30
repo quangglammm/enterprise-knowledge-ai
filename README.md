@@ -87,7 +87,7 @@ Tests and CI never call a model provider.
 | `GET /v1/documents/{id}` | Current version's metadata and status. `404` once deleted. |
 | `GET /v1/documents/{id}/chunks` | Chunks of the current (or `?version=`) version, with page, section and character offsets. Superseded versions have no chunks (ADR-0008). |
 | `DELETE /v1/documents/{id}` | Remove every version from search and storage. `204`, also when already deleted. |
-| `POST /v1/search` | `{"query": "...", "k": 5}` returns access-checked evidence. |
+| `POST /v1/search` | `{"query": "...", "k": 5}` returns access-checked evidence, ranked by vector similarity or, with `EKA_RETRIEVAL_MODE=hybrid`, by vector plus full-text search (ADR-0014). |
 | `POST /v1/answers` | `{"question": "..."}` returns an answer with validated citations, or `status: insufficient_evidence`. Model failures are `502`/`504`. Provider failures are `502`, or `503` when throttled. Returns `503` when no chat model is configured (`EKA_LLM_API_KEY`). |
 
 Interactive docs are at `/docs` when the API runs.
@@ -177,6 +177,7 @@ More packages (`agents`, `worker`) are added when their first feature lands, rat
 - [ADR-0011: Benchmark v1: corpus, chunk-ID labels and retrieval metrics](docs/adr/0011-benchmark-v1.md)
 - [ADR-0012: Benchmark v2: superset corpus with hard distractors and public documents](docs/adr/0012-benchmark-v2.md)
 - [ADR-0013: Retrieval experiments: versioned configurations and derived label sets](docs/adr/0013-retrieval-experiments.md)
+- [ADR-0014: Hybrid retrieval: IDF-weighted full-text search fused with vectors by RRF](docs/adr/0014-hybrid-retrieval.md)
 
 ## Data
 

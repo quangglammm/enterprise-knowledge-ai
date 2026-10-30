@@ -84,6 +84,25 @@ class ChunkSearch(Protocol):
         """
         ...
 
+    async def search_lexical(
+        self,
+        principal: Principal,
+        query_text: str,
+        query_vector: Vector,
+        *,
+        k: int,
+        embedding_model: str,
+    ) -> list[RetrievedEvidence]:
+        """Top-k chunks by full-text relevance to ``query_text``, best first (ADR-0014).
+
+        Same filters as ``search``, inside the query. Relevance is the sum of BM25-style
+        IDF over the query terms a chunk's title, section or text contains, with document
+        frequencies counted over the chunks the principal can see; ties by chunk ID. Chunks
+        matching no term are not returned. ``score`` is still the cosine similarity to
+        ``query_vector``, so every search mode reports evidence on one scale.
+        """
+        ...
+
 
 class Embedder(Protocol):
     @property

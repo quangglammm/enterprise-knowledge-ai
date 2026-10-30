@@ -96,3 +96,32 @@ def test_env_example_loads_with_offline_defaults() -> None:
 
     assert loaded.embedding_provider == "hashing"
     assert (loaded.llm_api_key, loaded.llm_model, loaded.embedding_api_key) == (None, None, None)
+
+
+def test_retrieval_defaults_to_vector_search() -> None:
+    defaults = settings()
+
+    assert (defaults.retrieval_mode, defaults.rrf_k, defaults.hybrid_candidates) == (
+        "vector",
+        60,
+        50,
+    )
+
+
+def test_hybrid_retrieval_reads_its_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("EKA_DATABASE_URL", "postgresql://u:p@db/eka")
+    monkeypatch.setenv("EKA_RETRIEVAL_MODE", "hybrid")
+    monkeypatch.setenv("EKA_RRF_K", "30")
+    monkeypatch.setenv("EKA_HYBRID_CANDIDATES", "40")
+
+    loaded = Settings(_env_file=None)
+
+    assert (loaded.retrieval_mode, loaded.rrf_k, loaded.hybrid_candidates) == ("hybrid", 30, 40)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"), [("retrieval_mode", "keyword"), ("rrf_k", 0), ("hybrid_candidates", 0)]
+)
+def test_invalid_retrieval_settings_fail_clearly(field: str, value: object) -> None:
+    with pytest.raises(ValidationError, match=field):
+        settings(**{field: value})

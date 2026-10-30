@@ -2,10 +2,13 @@
 
 The search applies access, version and model filters *before* ranking, mirroring the SQL
 WHERE clause (ADR-0003). Contract tests in tests/contract run against this and Postgres.
+Lexical search approximates Postgres's ``simple`` text-search parser: lowercase words, with
+dotted tokens such as ``gov.uk`` or ``1.500.000`` kept whole (ADR-0014).
 """
 
 import math
-from collections.abc import Sequence
+import re
+from collections.abc import Iterator, Sequence
 
 from enterprise_knowledge.domain.access import Principal
 from enterprise_knowledge.domain.documents import (
@@ -22,6 +25,7 @@ from enterprise_knowledge.domain.ports import Vector
 from enterprise_knowledge.domain.retrieval import RetrievedEvidence
 
 _Key = tuple[TenantId, DocumentId, int]
+_TOKEN = re.compile(r"\w+(?:\.\w+)*")
 
 
 class InMemoryDocumentStore:
@@ -110,7 +114,50 @@ class InMemoryDocumentStore:
         if k < 1:
             raise ValueError("k must be at least 1")
 
-        scored: list[tuple[float, DocumentChunk, Document]] = []
+        scored = [
+            (_cosine(query_vector, self._embeddings[chunk.id].vector), chunk, document)
+            for chunk, document in self._visible(principal, embedding_model)
+        ]
+        scored.sort(key=lambda item: (-item[0], item[1].id))
+        return [_evidence(score, chunk, document) for score, chunk, document in scored[:k]]
+
+    async def search_lexical(
+        self,
+        principal: Principal,
+        query_text: str,
+        query_vector: Vector,
+        *,
+        k: int,
+        embedding_model: str,
+    ) -> list[RetrievedEvidence]:
+        if k < 1:
+            raise ValueError("k must be at least 1")
+
+        visible = [
+            (chunk, document, _terms(document.title, chunk.source.section or "", chunk.text))
+            for chunk, document in self._visible(principal, embedding_model)
+        ]
+        query = _terms(query_text)
+        df = {t: sum(1 for _, _, terms in visible if t in terms) for t in query}
+        n = len(visible)
+        idf = {t: math.log(1 + (n - df[t] + 0.5) / (df[t] + 0.5)) for t in query if df[t]}
+        ranked = sorted(
+            (
+                (sum(idf[t] for t in idf if t in terms), chunk, document)
+                for chunk, document, terms in visible
+                if terms & idf.keys()
+            ),
+            key=lambda item: (-item[0], item[1].id),
+        )
+        return [
+            _evidence(_cosine(query_vector, self._embeddings[chunk.id].vector), chunk, document)
+            for _, chunk, document in ranked[:k]
+        ]
+
+    def _visible(
+        self, principal: Principal, embedding_model: str
+    ) -> Iterator[tuple[DocumentChunk, Document]]:
+        """Chunks search may rank: served version, readable, embedded by the model."""
         for key, chunks in self._chunks.items():
             document = self._documents[key]
             if document.version != self._serving_version(document.tenant_id, document.id):
@@ -118,13 +165,9 @@ class InMemoryDocumentStore:
             for chunk in chunks:
                 if not principal.can_access(chunk.access):  # filter before ranking
                     continue
-                embedding = self._embeddings[chunk.id]
-                if embedding.model != embedding_model:
+                if self._embeddings[chunk.id].model != embedding_model:
                     continue
-                scored.append((_cosine(query_vector, embedding.vector), chunk, document))
-
-        scored.sort(key=lambda item: (-item[0], item[1].id))
-        return [_evidence(score, chunk, document) for score, chunk, document in scored[:k]]
+                yield chunk, document
 
     def _serving_version(self, tenant_id: TenantId, document_id: DocumentId) -> int | None:
         return serving_version(
@@ -144,6 +187,10 @@ class InMemoryDocumentStore:
 
 def _key(document: Document) -> _Key:
     return (document.tenant_id, document.id, document.version)
+
+
+def _terms(*texts: str) -> set[str]:
+    return {t for text in texts for t in _TOKEN.findall(text.lower())}
 
 
 def _cosine(a: Vector, b: Vector) -> float:

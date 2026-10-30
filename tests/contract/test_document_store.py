@@ -398,3 +398,170 @@ async def test_search_returns_full_evidence(store: Store, embedder: HashEmbedder
     assert hit.access == document.access
     assert hit.source.page == 1
     assert 0 < hit.score <= 1.0001
+
+
+# --- lexical search (ADR-0014) --------------------------------------------------------
+
+
+async def lexical_ids(
+    store: Store,
+    embedder: HashEmbedder,
+    query: str,
+    *groups: str,
+    k: int = 5,
+    model: str = MODEL,
+) -> list[str]:
+    hits = await store.search_lexical(
+        make_principal(TENANT, *groups),
+        query,
+        await embedder.embed_query(query),
+        k=k,
+        embedding_model=model,
+    )
+    return [h.text for h in hits]
+
+
+async def test_lexical_search_weights_rare_terms_above_common_ones(
+    store: Store, embedder: HashEmbedder
+) -> None:
+    await index(
+        store,
+        embedder,
+        make_document(title="Handbook"),
+        "what is the policy in the office",
+        "what is the rule in the warehouse",
+        "what is the plan in the canteen",
+        "Da Nang",
+    )
+
+    hits = await lexical_ids(store, embedder, "what is the allowance in Da Nang", "all-staff")
+
+    # Four common terms lose to two rare ones: plain term counting would rank "Da Nang" last.
+    assert hits[0] == "Da Nang"
+    assert len(hits) == 4
+
+
+async def test_chunks_matching_no_query_term_are_not_lexical_hits(
+    store: Store, embedder: HashEmbedder
+) -> None:
+    await index(
+        store, embedder, make_document(title="Handbook"), "vpn setup guide", "printer toner"
+    )
+
+    assert await lexical_ids(store, embedder, "vpn", "all-staff") == ["vpn setup guide"]
+    assert await lexical_ids(store, embedder, "parking", "all-staff") == []
+
+
+async def test_title_and_section_are_searchable_lexically(
+    store: Store, embedder: HashEmbedder
+) -> None:
+    document = make_document(title="Payroll calendar")
+    await store.add_document(document)
+    chunk = DocumentChunk.for_document(
+        document, index=0, text="Rates apply.", source=SourceLocation(section="Overtime")
+    )
+    [vector] = await embedder.embed_documents([chunk.text])
+    embedding = Embedding(
+        chunk_id=chunk.id, model=MODEL, dimension=embedder.dimension, vector=vector
+    )
+    await store.replace_chunks(document, [chunk], [embedding])
+    await store.update_document(document.with_status(DocumentStatus.INDEXED, now=NOW))
+
+    assert await lexical_ids(store, embedder, "overtime", "all-staff") == ["Rates apply."]
+    assert await lexical_ids(store, embedder, "PAYROLL", "all-staff") == ["Rates apply."]
+
+
+async def test_vietnamese_terms_match_whole_and_keep_their_diacritics(
+    store: Store, embedder: HashEmbedder
+) -> None:
+    await index(
+        store,
+        embedder,
+        make_document(title="Kho vận"),
+        "Kho Đà Nẵng mở cửa lúc 7 giờ",
+        "Kho Da Nang cũ đã đóng cửa",
+    )
+
+    # Diacritics distinguish Vietnamese words, so "Đà Nẵng" does not match "Da Nang".
+    assert await lexical_ids(store, embedder, "đà nẵng", "all-staff") == [
+        "Kho Đà Nẵng mở cửa lúc 7 giờ"
+    ]
+
+
+async def test_lexical_search_never_returns_restricted_or_foreign_chunks(
+    store: Store, embedder: HashEmbedder
+) -> None:
+    await index(
+        store,
+        embedder,
+        make_document(id=DocumentId("salary"), title="HR", access=make_policy(TENANT, "hr")),
+        "salary bands",
+    )
+    await index(
+        store,
+        embedder,
+        make_document(id=DocumentId("foreign"), title="Other", access=make_policy(OTHER_TENANT)),
+        "salary bands abroad",
+    )
+    await index(
+        store,
+        embedder,
+        make_document(id=DocumentId("public"), title="Handbook", checksum="1" * 64),
+        "salary is paid monthly",
+    )
+
+    assert await lexical_ids(store, embedder, "salary bands", "all-staff") == [
+        "salary is paid monthly"
+    ]
+    assert (await lexical_ids(store, embedder, "salary bands", "hr"))[0] == "salary bands"
+
+
+async def test_lexical_search_serves_only_the_current_version_and_model(
+    store: Store, embedder: HashEmbedder
+) -> None:
+    await index(store, embedder, make_document(version=1, title="Leave"), "annual leave 12 days")
+    await index(
+        store,
+        embedder,
+        make_document(version=2, title="Leave", checksum="1" * 64),
+        "annual leave 14 days",
+    )
+    deleted = await index(
+        store,
+        embedder,
+        make_document(id=DocumentId("gone"), title="Old", checksum="2" * 64),
+        "annual leave archive",
+    )
+    await store.delete_document(TENANT, deleted.id)
+
+    assert await lexical_ids(store, embedder, "annual leave", "all-staff") == [
+        "annual leave 14 days"
+    ]
+    assert await lexical_ids(store, embedder, "annual leave", "all-staff", model="other") == []
+
+
+async def test_lexical_hits_carry_cosine_similarity_and_respect_k(
+    store: Store, embedder: HashEmbedder
+) -> None:
+    await index(
+        store,
+        embedder,
+        make_document(title="IT"),
+        "vpn setup guide",
+        "vpn troubleshooting",
+        "vpn client versions",
+    )
+    query = "vpn setup"
+    vector = await embedder.embed_query(query)
+
+    lexical = await store.search_lexical(
+        make_principal(), query, vector, k=2, embedding_model=MODEL
+    )
+    semantic = await store.search(make_principal(), vector, k=3, embedding_model=MODEL)
+
+    assert len(lexical) == 2
+    cosine = {h.chunk_id: h.score for h in semantic}
+    for hit in lexical:
+        assert hit.score == pytest.approx(cosine[hit.chunk_id], abs=1e-6)
+    with pytest.raises(ValueError, match="k"):
+        await store.search_lexical(make_principal(), query, vector, k=0, embedding_model=MODEL)

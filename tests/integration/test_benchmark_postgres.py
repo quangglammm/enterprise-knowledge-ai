@@ -22,7 +22,7 @@ from enterprise_knowledge.evaluation.benchmark import (
 from enterprise_knowledge.infrastructure.blobs import LocalBlobStore
 from enterprise_knowledge.infrastructure.embeddings.hashing import HashingEmbedder
 from enterprise_knowledge.infrastructure.postgres.store import PostgresDocumentStore
-from enterprise_knowledge.retrieval.search import SearchKnowledge
+from enterprise_knowledge.retrieval.search import RetrievalSettings, SearchKnowledge
 from tests.contract.conftest import reset_database
 
 pytestmark = pytest.mark.integration
@@ -41,8 +41,13 @@ def dataset(request: pytest.FixtureRequest) -> BenchmarkDataset:
     return load_benchmark(REPO / "datasets" / "benchmark" / version, corpus)
 
 
+@pytest.fixture(params=["vector", "hybrid"])
+def retrieval(request: pytest.FixtureRequest) -> RetrievalSettings:
+    return RetrievalSettings(mode=request.param)
+
+
 async def run_on_postgres(
-    url: str, dataset: BenchmarkDataset, blob_dir: Path
+    url: str, dataset: BenchmarkDataset, blob_dir: Path, retrieval: RetrievalSettings
 ) -> tuple[BenchmarkReport, BenchmarkReport]:
     await reset_database(url)
     embedder = HashingEmbedder()
@@ -55,7 +60,7 @@ async def run_on_postgres(
             blobs=LocalBlobStore(blob_dir),
             chunking=dataset.chunking,
         )
-        search = SearchKnowledge(search=store, embedder=embedder)
+        search = SearchKnowledge(search=store, embedder=embedder, retrieval=retrieval)
         first = await run_retrieval_benchmark(dataset, search, embedding_model=embedder.model)
         second = await run_retrieval_benchmark(dataset, search, embedding_model=embedder.model)
     finally:
@@ -64,9 +69,9 @@ async def run_on_postgres(
 
 
 async def test_full_benchmark_runs_on_postgres_deterministically(
-    postgres_url: str, dataset: BenchmarkDataset, tmp_path: Path
+    postgres_url: str, dataset: BenchmarkDataset, retrieval: RetrievalSettings, tmp_path: Path
 ) -> None:
-    first, second = await run_on_postgres(postgres_url, dataset, tmp_path)
+    first, second = await run_on_postgres(postgres_url, dataset, tmp_path, retrieval)
 
     questions, answerable, unanswerable, tenant = EXPECTED[dataset.version]
     assert first.model_dump(exclude={"started_at"}) == second.model_dump(exclude={"started_at"})
@@ -84,9 +89,9 @@ async def test_full_benchmark_runs_on_postgres_deterministically(
 
 
 async def test_restricted_and_other_tenant_chunks_never_rank(
-    postgres_url: str, dataset: BenchmarkDataset, tmp_path: Path
+    postgres_url: str, dataset: BenchmarkDataset, retrieval: RetrievalSettings, tmp_path: Path
 ) -> None:
-    report, _ = await run_on_postgres(postgres_url, dataset, tmp_path)
+    report, _ = await run_on_postgres(postgres_url, dataset, tmp_path, retrieval)
 
     readable = {question.id: question.principal.principal() for question in dataset.questions}
     documents_by_chunk = {
