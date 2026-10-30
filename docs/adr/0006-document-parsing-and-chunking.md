@@ -56,3 +56,7 @@ Week 4 found that `max_chars` barely changes corpus v2: from 400 to 3000 charact
 - **Chunk section:** a chunk's `section` is now the section of its first body unit, i.e. where the chunk starts. Default-mode output is unchanged (v1 and v2 labels rebuild byte-identical).
 
 The default stays off until the Week 4 benchmark shows packing helps (ADR-0013).
+
+**Measured (2026-10-30, `docs/evaluation/week4-retrieval-experiments.md`):**
+- Packing lowers Recall@1 on benchmark v2: 86.5% → 83.5% at 1200 characters and 82.5% at 800. Neither change is statistically clear; the default stays off.
+- The embedding header is confirmed: switching it off lowers Recall@1 from 86.5% to 81.5%, with 11 questions worse and 2 better (sign test p = 0.022).

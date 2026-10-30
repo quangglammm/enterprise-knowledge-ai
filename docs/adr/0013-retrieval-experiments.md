@@ -36,6 +36,16 @@ Configuration format: TOML files read with the standard library's `tomllib` (no 
 - **Comparison:** `compare_reports` (`evaluation/comparison.py`) requires the same question IDs. It returns metric deltas plus the questions whose reciprocal rank improved or worsened, because a mean can hide offsetting changes. `scripts/compare_reports.py` prints that, with cross-lingual, near-duplicate and multi-document Recall@1.
 - **Headline metrics:** Recall@1 and MRR. Benchmark v2 leaves little headroom at Recall@3 (ADR-0012).
 
+## Results (2026-10-30)
+
+First four experiments on FPT embeddings, written up in `docs/evaluation/week4-retrieval-experiments.md`:
+- **Baseline:** 86.5% Recall@1, MRR 0.930, reproduced exactly on a rerun.
+- **No header:** 81.5%, with 11 questions worse and 2 better (sign test p = 0.022).
+- **Packed-1200:** 83.5% (p = 0.118).
+- **Packed-800:** 82.5% (p = 0.077).
+
+The production defaults stand.
+
 ## Consequences
 
 - An experiment is a committed file plus a report that points back to it and to a commit. A result without a clean `code_revision` is not quoted as a finding.
