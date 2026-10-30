@@ -154,3 +154,27 @@ async def test_usage_is_summed_over_the_repair() -> None:
         + len(json.dumps({"verdict": "correct", "reason": "ok"})) // 4
     )
     assert judgment.input_tokens > 0
+
+
+async def test_reply_missing_its_final_closers_is_completed() -> None:
+    # Observed from Llama-3.3-70B on calibration case grnd-vi-06: the last "}" is dropped.
+    chat = ScriptedChatModel(['{"claims": [{"claim": "1,5 triệu", "supported_by": ["E1"]}]'])
+
+    judgment = await AnswerJudge(chat=chat).grounding(
+        question="q", answer="a", evidence=EVIDENCE, cited=["E1"]
+    )
+
+    assert judgment.faithful
+    assert not judgment.repaired
+
+
+@pytest.mark.parametrize(
+    "truncated",
+    ['{"verdict": "corr', '{"verdict": "correct", "reason": "a } b'],
+    ids=["inside-a-value", "brace-inside-a-string"],
+)
+async def test_reply_cut_inside_a_string_is_not_guessed(truncated: str) -> None:
+    chat = ScriptedChatModel([truncated, truncated])
+
+    with pytest.raises(JudgeOutputError):
+        await AnswerJudge(chat=chat).correctness(question="q", reference="r", answer="a")

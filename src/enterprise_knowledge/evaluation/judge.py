@@ -234,7 +234,36 @@ class AnswerJudge:
 def _unfence(content: str) -> str:
     body = content.strip()
     fenced = _FENCE.match(body)
-    return fenced.group("body") if fenced else body
+    return _close_unterminated(fenced.group("body") if fenced else body)
+
+
+def _close_unterminated(body: str) -> str:
+    """Append the closers of objects and arrays left open at the end of ``body``.
+
+    Llama-3.3-70B sometimes drops the final ``}`` of a reply (calibration case grnd-vi-06).
+    Only closing brackets are added, never content: a reply that ends inside a string is
+    returned unchanged and fails validation as before.
+    """
+    closers = {"{": "}", "[": "]"}
+    stack: list[str] = []
+    in_string = escaped = False
+    for char in body:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+        elif char == '"':
+            in_string = True
+        elif char in closers:
+            stack.append(closers[char])
+        elif char in "}]" and stack and stack[-1] == char:
+            stack.pop()
+    if in_string or not stack:
+        return body
+    return body + "".join(reversed(stack))
 
 
 def _describe(exc: ValueError) -> str:
