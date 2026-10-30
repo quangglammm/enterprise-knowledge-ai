@@ -88,6 +88,8 @@ class QuestionType(StrEnum):
     ACCESS_SENSITIVE = "access-sensitive"
     TENANT_ISOLATION = "tenant-isolation"
     UNANSWERABLE = "unanswerable"
+    # A near-identical chunk competes: a sibling document, a statute or a stale restatement.
+    NEAR_DUPLICATE = "near-duplicate"
 
 
 class ChunkRef(BaseModel):

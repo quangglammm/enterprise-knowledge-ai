@@ -27,7 +27,7 @@ from enterprise_knowledge.ingestion.prepare import prepare_document
 
 ROOT = Path(__file__).resolve().parents[1]
 CHUNKING = ChunkingSettings()  # the ingestion defaults: 1200 characters, 150 overlap
-VERSIONS = ("v1",)
+VERSIONS = ("v1", "v2")
 
 
 def normalize(text: str) -> str:

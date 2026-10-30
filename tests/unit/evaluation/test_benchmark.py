@@ -332,8 +332,39 @@ def test_bundled_benchmark_and_corpus_are_consistent() -> None:
 
     types = [t for q in dataset.questions for t in q.types]
     assert len(dataset.questions) == 50
-    for required in QuestionType:
+    for required in set(QuestionType) - {QuestionType.NEAR_DUPLICATE}:  # added in v2
         assert required in types, required
     assert sum(1 for q in dataset.questions if not q.answerable) >= 6
     assert {d.tenant for d in corpus.documents} == {"bamboo-harbor", "lotus-retail"}
     assert sum(1 for d in corpus.documents if d.version > 1) >= 3
+
+
+def test_bundled_benchmark_v2_meets_corpus_v2_targets() -> None:
+    corpus = load_corpus(REPO / "datasets" / "corpus" / "v2")
+    dataset = load_benchmark(REPO / "datasets" / "benchmark" / "v2", corpus)
+
+    served = [d for d in corpus.documents if corpus.served(d.id) == d]
+    types = [t for q in dataset.questions for t in q.types]
+    assert len(served) >= 45
+    assert len({d.id for d in corpus.documents if d.version > 1}) >= 5
+    assert sum(1 for d in served if "all-staff" not in d.allowed_groups) >= 10
+    assert sum(1 for d in served if d.source.startswith("public:")) >= 2
+    assert sum(1 for d in served if d.language == "vi") / len(served) >= 0.5
+    assert len(dataset.questions) >= 100
+    assert sum(1 for q in dataset.questions if not q.answerable) >= 10
+    for required in QuestionType:
+        assert required in types, required
+
+
+def test_benchmark_v2_keeps_every_v1_question_and_document() -> None:
+    v1 = load_benchmark(
+        REPO / "datasets" / "benchmark" / "v1", load_corpus(REPO / "datasets" / "corpus" / "v1")
+    )
+    v2 = load_benchmark(
+        REPO / "datasets" / "benchmark" / "v2", load_corpus(REPO / "datasets" / "corpus" / "v2")
+    )
+
+    v2_questions = {(q.id, q.question, q.principal.model_dump_json()) for q in v2.questions}
+    assert {(q.id, q.question, q.principal.model_dump_json()) for q in v1.questions} <= v2_questions
+    v2_files = {(d.id, d.version, d.sha256) for d in v2.corpus.documents}
+    assert {(d.id, d.version, d.sha256) for d in v1.corpus.documents} <= v2_files

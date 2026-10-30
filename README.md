@@ -131,6 +131,8 @@ datasets/
   fixtures/       small synthetic bilingual documents for parser tests
   corpus/v1/      bilingual Bamboo Harbor corpus (21 documents, 2 tenants) and its manifest
   benchmark/v1/   50 labelled retrieval questions (ADR-0011)
+  corpus/v2/      superset of v1 with distractors and 2 public documents (49 documents)
+  benchmark/v2/   115 labelled retrieval questions (ADR-0012); the scripts default to v2
   model_trial/    versioned grounded-answer cases for the ADR-0004 model trial
 scripts/          fixtures, benchmark builder and runner, chunk viewer, FPT smoke test, model trial
 docs/
@@ -169,6 +171,7 @@ More packages (`agents`, `worker`) are added when their first feature lands, rat
 - [ADR-0009: Grounded answer generation and citation validation](docs/adr/0009-grounded-answer-generation.md)
 - [ADR-0010: FPT model adapters: transport, retries and errors](docs/adr/0010-fpt-model-adapters.md)
 - [ADR-0011: Benchmark v1: corpus, chunk-ID labels and retrieval metrics](docs/adr/0011-benchmark-v1.md)
+- [ADR-0012: Benchmark v2: superset corpus with hard distractors and public documents](docs/adr/0012-benchmark-v2.md)
 
 ## Data
 

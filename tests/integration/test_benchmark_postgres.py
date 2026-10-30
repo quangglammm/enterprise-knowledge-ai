@@ -30,10 +30,15 @@ pytestmark = pytest.mark.integration
 REPO = Path(__file__).resolve().parents[2]
 
 
-@pytest.fixture(scope="module")
-def dataset() -> BenchmarkDataset:
-    corpus = load_corpus(REPO / "datasets" / "corpus" / "v1")
-    return load_benchmark(REPO / "datasets" / "benchmark" / "v1", corpus)
+# version, then (questions, answerable, unanswerable, tenant-isolation questions)
+EXPECTED = {"v1": (50, 44, 6, 2), "v2": (115, 100, 15, 5)}
+
+
+@pytest.fixture(scope="module", params=sorted(EXPECTED))
+def dataset(request: pytest.FixtureRequest) -> BenchmarkDataset:
+    version: str = request.param
+    corpus = load_corpus(REPO / "datasets" / "corpus" / version)
+    return load_benchmark(REPO / "datasets" / "benchmark" / version, corpus)
 
 
 async def run_on_postgres(
@@ -63,14 +68,19 @@ async def test_full_benchmark_runs_on_postgres_deterministically(
 ) -> None:
     first, second = await run_on_postgres(postgres_url, dataset, tmp_path)
 
+    questions, answerable, unanswerable, tenant = EXPECTED[dataset.version]
     assert first.model_dump(exclude={"started_at"}) == second.model_dump(exclude={"started_at"})
-    assert (first.questions, first.answerable, first.unanswerable) == (50, 44, 6)
+    assert (first.questions, first.answerable, first.unanswerable) == (
+        questions,
+        answerable,
+        unanswerable,
+    )
     assert first.access_violations == 0
     assert first.embedding_model == "hashing-v1"
     for value in first.recall_at_k.values():
         assert value is not None
         assert 0.0 <= value <= 1.0
-    assert first.by_type[QuestionType.TENANT_ISOLATION].questions == 2
+    assert first.by_type[QuestionType.TENANT_ISOLATION].questions == tenant
 
 
 async def test_restricted_and_other_tenant_chunks_never_rank(

@@ -3,9 +3,9 @@
     uv run python scripts/run_benchmark.py --database-url postgresql://eka:eka@localhost:5432/eka_test
     uv run python scripts/run_benchmark.py --database-url ... --embedding fpt   # paid calls
 
-Migrates and WIPES the given database, indexes corpus v1 through the production ingestion
-path with stable document IDs, runs every question as its principal, and writes a report
-to docs/evaluation/. Refuses to touch the app database (EKA_DATABASE_URL). The hashing
+Migrates and WIPES the given database, indexes the corpus (default v2) through the production
+ingestion path with stable document IDs, runs every question as its principal, and writes a
+report to docs/evaluation/. Refuses to touch the app database (EKA_DATABASE_URL). The hashing
 embedder measures the pipeline only; real retrieval quality needs --embedding fpt.
 """
 
@@ -47,8 +47,8 @@ def parse_args() -> argparse.Namespace:
         "--embedding", choices=["hashing", "fpt"], help="default: EKA_EMBEDDING_PROVIDER"
     )
     parser.add_argument("--k", default="1,3,5,10", help="comma-separated k values")
-    parser.add_argument("--corpus", type=Path, default=ROOT / "datasets" / "corpus" / "v1")
-    parser.add_argument("--benchmark", type=Path, default=ROOT / "datasets" / "benchmark" / "v1")
+    parser.add_argument("--corpus", type=Path, default=ROOT / "datasets" / "corpus" / "v2")
+    parser.add_argument("--benchmark", type=Path, default=ROOT / "datasets" / "benchmark" / "v2")
     parser.add_argument("--out", type=Path, help="report path (default: docs/evaluation/...)")
     return parser.parse_args()
 
