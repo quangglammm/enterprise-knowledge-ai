@@ -49,6 +49,15 @@ Structure: one call returning all three verdicts (cheaper, but one verdict can s
   No answer text is stored by default.
 - **Calibration:** `datasets/judge_calibration/cases-v1.jsonl` holds 24 hand-labelled bilingual cases, 12 correctness and 12 grounding. Every verdict class is covered, including a cross-language answer, number-format paraphrases, an answer text that instructs the judge, and evidence that instructs the judge. `scripts/judge_calibration.py` reports agreement per metric. Judged numbers are quoted together with that agreement.
 
+## Calibration (2026-10-30)
+
+`Llama-3.3-70B-Instruct`, prompt `judge-v1`, 24 cases. Reports: `docs/evaluation/judge-calibration-*.json`.
+
+- **First run** (`judge-calibration-20261030-035832.json`, code `3c88fae`): every judged case agreed, but `grnd-vi-06` failed as `judge_output_invalid` even after repair. Both of the model's replies were correct but dropped the final `}`.
+- **Fix** (`32061ab`): the judge's parser now appends closers for objects and arrays left open at the end of a reply. It never adds content; a reply cut off inside a string still fails.
+- **Rerun** (`judge-calibration-20261030-040008.json`): agreement was 12/12 on correctness, 12/12 on faithfulness and 12/12 on citation support, with 0 judge errors. The answer text that instructs the judge (`corr-en-06`) and the evidence that instructs it (`grnd-vi-05`) were both judged correctly. The run used 6,876 input and 817 output tokens.
+- **Limits:** 24 clear-cut cases, written by the same author as the benchmark, show the judge follows the rubric. They do not show how it handles borderline real answers, and they do not measure self-preference on the model's own answers. The slice-2 write-up therefore reports judged metrics together with the deterministic ones, and spot-checks a sample of real verdicts by hand.
+
 ## Consequences
 
 - **Confidence in judged numbers:** they are only as trustworthy as calibration agreement on 24 cases. A metric whose agreement is poor is reported as unreliable, not tuned around.
