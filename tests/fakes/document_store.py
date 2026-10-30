@@ -48,6 +48,11 @@ class InMemoryDocumentStore:
         ]
         return max(versions, key=lambda d: d.version, default=None)
 
+    async def get_document_version(
+        self, tenant_id: TenantId, document_id: DocumentId, version: int
+    ) -> Document | None:
+        return self._documents.get((tenant_id, document_id, version))
+
     async def find_by_checksum(self, tenant_id: TenantId, checksum: str) -> Document | None:
         matches = [
             d

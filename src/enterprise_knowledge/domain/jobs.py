@@ -1,9 +1,10 @@
 """Ingestion job state machine (JOB-01).
 
     QUEUED --start--> RUNNING --succeed--> SUCCEEDED
-                         |
-                         +--fail(retryable, attempts left)--> QUEUED
-                         +--fail(otherwise)-----------------> FAILED
+      |                  |
+      |                  +--fail(retryable, attempts left)--> QUEUED
+      |                  +--fail(otherwise)-----------------> FAILED
+      +--abandon (never delivered, e.g. enqueue failed)-----> FAILED
 
 Transitions return new instances; invalid transitions raise.
 """
@@ -39,6 +40,8 @@ class IngestionJob(BaseModel):
     created_at: AwareDatetime
     updated_at: AwareDatetime
     error_category: str | None = None
+    # False when the uploader gave a title, so the worker keeps it instead of the parsed one.
+    use_parsed_title: bool = True
 
     @classmethod
     def new(
@@ -50,6 +53,7 @@ class IngestionJob(BaseModel):
         document_version: int,
         max_attempts: int,
         now: AwareDatetime,
+        use_parsed_title: bool = True,
     ) -> "IngestionJob":
         return cls(
             id=job_id,
@@ -61,6 +65,7 @@ class IngestionJob(BaseModel):
             max_attempts=max_attempts,
             created_at=now,
             updated_at=now,
+            use_parsed_title=use_parsed_title,
         )
 
     @property
@@ -83,6 +88,10 @@ class IngestionJob(BaseModel):
             updated_at=now,
             error_category=error_category,
         )
+
+    def abandon(self, *, now: AwareDatetime, error_category: str) -> "IngestionJob":
+        self._require(JobStatus.QUEUED, "abandon")
+        return self._evolve(status=JobStatus.FAILED, updated_at=now, error_category=error_category)
 
     def _require(self, expected: JobStatus, action: str) -> None:
         if self.status is not expected:

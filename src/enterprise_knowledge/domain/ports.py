@@ -12,6 +12,7 @@ from enterprise_knowledge.domain.access import Principal
 from enterprise_knowledge.domain.chat import ChatRequest, ChatResponse
 from enterprise_knowledge.domain.documents import Document, DocumentChunk, Embedding
 from enterprise_knowledge.domain.ids import DocumentId, JobId, TenantId
+from enterprise_knowledge.domain.jobs import IngestionJob
 from enterprise_knowledge.domain.retrieval import RetrievedEvidence
 
 Vector = tuple[float, ...]
@@ -31,6 +32,12 @@ class DocumentRepository(Protocol):
 
     async def get_document(self, tenant_id: TenantId, document_id: DocumentId) -> Document | None:
         """Return the current (highest) version, or None if absent or in another tenant."""
+        ...
+
+    async def get_document_version(
+        self, tenant_id: TenantId, document_id: DocumentId, version: int
+    ) -> Document | None:
+        """Return one specific version, or None if absent or in another tenant."""
         ...
 
     async def find_by_checksum(self, tenant_id: TenantId, checksum: str) -> Document | None:
@@ -132,13 +139,44 @@ class QueueMessage(BaseModel):
 
 
 class JobQueue(Protocol):
-    """At-least-once delivery: consumers must be idempotent (JOB-01)."""
+    """At-least-once delivery: consumers must be idempotent (JOB-01, ADR-0016).
 
-    async def enqueue(self, job_id: JobId) -> None: ...
+    A received message is leased for the queue's visibility timeout; unless acked in that
+    time it is delivered again with a higher ``delivery_count``. Concurrent consumers never
+    hold the same message at once.
+    """
 
-    async def receive(self, *, max_messages: int, wait_seconds: float) -> list[QueueMessage]: ...
+    async def enqueue(self, job_id: JobId, *, delay_seconds: float = 0.0) -> None:
+        """Make a message for ``job_id`` receivable after ``delay_seconds``."""
+        ...
 
-    async def ack(self, message: QueueMessage) -> None: ...
+    async def receive(self, *, max_messages: int, wait_seconds: float) -> list[QueueMessage]:
+        """Lease up to ``max_messages`` ready messages, waiting up to ``wait_seconds``."""
+        ...
+
+    async def ack(self, message: QueueMessage) -> None:
+        """Remove a leased message. Acking a message whose lease expired is a no-op."""
+        ...
+
+
+class JobRepository(Protocol):
+    """Ingestion job state (JOB-01). Jobs are looked up by ID; callers check the tenant."""
+
+    async def add_job(self, job: IngestionJob) -> None:
+        """Insert a new job. Raises if the ID exists."""
+        ...
+
+    async def get_job(self, job_id: JobId) -> IngestionJob | None: ...
+
+    async def update_job(self, job: IngestionJob) -> None:
+        """Replace the stored state of an existing job."""
+        ...
+
+    async def latest_job_for(
+        self, tenant_id: TenantId, document_id: DocumentId, version: int
+    ) -> IngestionJob | None:
+        """The most recently created job for one document version."""
+        ...
 
 
 class BlobStore(Protocol):

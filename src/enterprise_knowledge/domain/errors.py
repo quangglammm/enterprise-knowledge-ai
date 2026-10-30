@@ -14,6 +14,14 @@ class InvalidJobTransitionError(DomainError):
     category: ClassVar[str] = "invalid_job_transition"
 
 
+class JobAlreadyExistsError(DomainError):
+    category: ClassVar[str] = "job_exists"
+
+
+class JobNotFoundError(DomainError):
+    category: ClassVar[str] = "job_not_found"
+
+
 class DocumentAlreadyExistsError(DomainError):
     category: ClassVar[str] = "document_exists"
 

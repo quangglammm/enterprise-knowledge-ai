@@ -229,6 +229,20 @@ class PostgresDocumentStore:
             row = await cur.fetchone()
         return _document(row) if row else None
 
+    async def get_document_version(
+        self, tenant_id: TenantId, document_id: DocumentId, version: int
+    ) -> Document | None:
+        async with self._pool.connection() as conn:
+            cur = await conn.cursor(row_factory=dict_row).execute(
+                sql.SQL(
+                    "SELECT {columns} FROM documents"
+                    " WHERE tenant_id = %s AND id = %s AND version = %s"
+                ).format(columns=_DOCUMENT_COLUMNS),
+                (tenant_id, document_id, version),
+            )
+            row = await cur.fetchone()
+        return None if row is None else _document(row)
+
     async def find_by_checksum(self, tenant_id: TenantId, checksum: str) -> Document | None:
         async with self._pool.connection() as conn:
             cur = await conn.cursor(row_factory=dict_row).execute(

@@ -65,12 +65,11 @@ async def test_scripted_chat_model_replays_and_raises() -> None:
 
 
 async def test_queue_redelivers_unacked_messages_with_count() -> None:
-    queue = InMemoryJobQueue()
+    queue = InMemoryJobQueue(visibility_seconds=0)  # every lease expires at once
     port: JobQueue = queue
     await port.enqueue(JobId("j1"))
 
     [first] = await port.receive(max_messages=10, wait_seconds=0)
-    queue.expire_in_flight()
     [again] = await port.receive(max_messages=10, wait_seconds=0)
     await port.ack(again)
 

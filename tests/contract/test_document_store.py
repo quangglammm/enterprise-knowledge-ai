@@ -565,3 +565,19 @@ async def test_lexical_hits_carry_cosine_similarity_and_respect_k(
         assert hit.score == pytest.approx(cosine[hit.chunk_id], abs=1e-6)
     with pytest.raises(ValueError, match="k"):
         await store.search_lexical(make_principal(), query, vector, k=0, embedding_model=MODEL)
+
+
+async def test_get_document_version_returns_that_version_only(
+    store: Store, embedder: HashEmbedder
+) -> None:
+    await index(store, embedder, make_document(version=1), "annual leave is 12 days")
+    await index(
+        store, embedder, make_document(version=2, checksum="1" * 64), "annual leave is 14 days"
+    )
+
+    first = await store.get_document_version(TENANT, DocumentId("doc-1"), 1)
+
+    assert first is not None
+    assert first.version == 1
+    assert await store.get_document_version(TENANT, DocumentId("doc-1"), 3) is None
+    assert await store.get_document_version(OTHER_TENANT, DocumentId("doc-1"), 1) is None

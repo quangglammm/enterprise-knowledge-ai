@@ -116,3 +116,12 @@ def test_invalid_transitions_raise(status: JobStatus, action: Action) -> None:
 def test_max_attempts_must_be_positive() -> None:
     with pytest.raises(ValueError, match="max_attempts"):
         new_job(max_attempts=0)
+
+
+def test_a_job_that_never_started_can_be_abandoned() -> None:
+    abandoned = new_job().abandon(now=T0, error_category="enqueue_failed")
+
+    assert (abandoned.status, abandoned.attempts) == (JobStatus.FAILED, 0)
+    assert abandoned.error_category == "enqueue_failed"
+    with pytest.raises(InvalidJobTransitionError):
+        new_job().start(now=T0).abandon(now=T0, error_category="x")
