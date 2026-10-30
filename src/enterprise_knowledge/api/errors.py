@@ -17,6 +17,7 @@ from enterprise_knowledge.domain.errors import (
     DocumentAlreadyExistsError,
     DocumentNotFoundError,
     DomainError,
+    JobNotFoundError,
     ModelProviderError,
     ModelRateLimitedError,
 )
@@ -60,6 +61,7 @@ _DOMAIN_STATUS: list[tuple[type[DomainError], int]] = [
     (IngestionError, status.HTTP_422_UNPROCESSABLE_CONTENT),
     (InvalidQueryError, status.HTTP_422_UNPROCESSABLE_CONTENT),
     (DocumentNotFoundError, status.HTTP_404_NOT_FOUND),
+    (JobNotFoundError, status.HTTP_404_NOT_FOUND),
     # Two uploads raced to create the same version; the client may retry.
     (DocumentAlreadyExistsError, status.HTTP_409_CONFLICT),
     # The model, not the request, failed (ADR-0009). Never reported as an abstention.

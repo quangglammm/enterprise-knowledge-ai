@@ -26,7 +26,7 @@ uv run eka-api                # http://127.0.0.1:8000/docs
 Or run everything in containers:
 
 ```bash
-docker compose up --build      # postgres, then migrations, then the API
+docker compose up --build      # postgres, then migrations, then the API and the ingestion worker
 curl -i http://localhost:8000/health/ready
 ```
 
@@ -41,6 +41,7 @@ curl -i http://localhost:8000/health/ready
 | Unit tests | `uv run pytest` |
 | Integration tests | `docker compose up -d postgres` then `EKA_TEST_DATABASE_URL=postgresql://eka:eka@localhost:5432/eka_test uv run pytest -m integration` |
 | Apply migrations | `uv run eka-migrate` |
+| Run the ingestion worker | `uv run eka-worker` (processes uploads queued by the API; stops cleanly on SIGTERM) |
 | Retrieval benchmark | `uv run python scripts/run_benchmark.py --database-url postgresql://eka:eka@localhost:5432/eka_test` (wipes that database; add `--embedding fpt` for real retrieval, paid) |
 | Retrieval experiment | `uv run python scripts/run_benchmark.py --database-url ... --experiment experiments/week4/packed-1200.toml` (add `--embedding hashing` for a free dry run) |
 | Compare reports | `uv run python scripts/compare_reports.py <baseline.json> <candidate.json> ...` |
@@ -84,7 +85,8 @@ Tests and CI never call a model provider.
 | --- | --- |
 | `GET /health/live` | Process is running. Never checks dependencies. |
 | `GET /health/ready` | Instance can serve traffic. Checks the database; `503` if any check fails. |
-| `POST /v1/documents` | Upload a file (`multipart/form-data`: `file`, `allowed_groups`, optional `title`, optional `document_id` for a new version). `201` when indexed, `200` when identical content is already indexed. |
+| `POST /v1/documents` | Upload a file (`multipart/form-data`: `file`, `allowed_groups`, optional `title`, optional `document_id` for a new version). `202` with a pending version and its ingestion job, which the worker processes; `200` with no job when identical content is already indexed. Size and format are checked in the request (`413`, `415`); parse failures fail the job (ADR-0016). |
+| `GET /v1/jobs/{id}` | Ingestion job status (`queued`, `running`, `succeeded`, `failed`), attempts and error category. `404` unless the caller may read the job's document. |
 | `GET /v1/documents/{id}` | Current version's metadata and status. `404` once deleted. |
 | `GET /v1/documents/{id}/chunks` | Chunks of the current (or `?version=`) version, with page, section and character offsets. Superseded versions have no chunks (ADR-0008). |
 | `DELETE /v1/documents/{id}` | Remove every version from search and storage. `204`, also when already deleted. |
@@ -98,7 +100,8 @@ Interactive docs are at `/docs` when the API runs.
 ```bash
 H='-H X-Tenant-ID:bamboo-harbor -H X-User-ID:an -H X-User-Groups:all-staff'
 curl -s $H -F file=@datasets/fixtures/leave-policy-vi.pdf -F allowed_groups=all-staff \
-  http://localhost:8000/v1/documents
+  http://localhost:8000/v1/documents            # 202: {"document": ..., "job": {"id": ...}}
+curl -s $H http://localhost:8000/v1/jobs/<job id>   # "succeeded" once the worker is done
 curl -s $H -H 'Content-Type: application/json' \
   -d '{"query": "số ngày nghỉ phép năm", "k": 3}' http://localhost:8000/v1/search
 ```
@@ -116,12 +119,13 @@ Every response carries an `X-Request-ID` header. A caller-supplied ID is reused 
 ```
 src/enterprise_knowledge/
   domain/         models, access policy, job state machine, ports (no SDK imports)
-  ingestion/      format detection, parsing, normalization, chunking, IngestDocument and DeleteDocument use cases
+  ingestion/      format detection, parsing, normalization, chunking; IngestDocument, SubmitDocument, ProcessIngestionJob and DeleteDocument use cases
   retrieval/      SearchKnowledge use case
   generation/     AnswerQuestion and GenerateAnswer use cases, versioned prompt, answer parsing and citation checks
-  evaluation/     retrieval benchmark, Recall@k and MRR, model trial scoring
-  infrastructure/ adapters: Postgres store and vector search, migrations, blob store, FPT chat and embeddings, dev embedder
+  evaluation/     retrieval benchmark and experiments, answer-quality judge, model trial scoring
+  infrastructure/ adapters: Postgres store, vector and full-text search, job store and queue, migrations, blob store, FPT chat and embeddings, dev embedder
   api/            HTTP layer only (routes, middleware, app factory)
+  worker/         ingestion worker process (eka-worker): poll loop, backoff, graceful shutdown
   observability/  structured logging, later tracing and metrics
   config.py       typed settings
 tests/
@@ -181,6 +185,7 @@ More packages (`agents`, `worker`) are added when their first feature lands, rat
 - [ADR-0013: Retrieval experiments: versioned configurations and derived label sets](docs/adr/0013-retrieval-experiments.md)
 - [ADR-0014: Hybrid retrieval: IDF-weighted full-text search fused with vectors by RRF](docs/adr/0014-hybrid-retrieval.md)
 - [ADR-0015: Answer-quality evaluation with a calibrated LLM judge](docs/adr/0015-answer-quality-evaluation.md)
+- [ADR-0016: Asynchronous ingestion with a Postgres job queue](docs/adr/0016-asynchronous-ingestion.md)
 
 ## Data
 

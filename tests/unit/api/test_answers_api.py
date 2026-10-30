@@ -30,12 +30,14 @@ class Client:
     """An app whose answer use case replays ``script`` as the model's replies."""
 
     def __init__(self, *script: str | Exception) -> None:
-        services = make_services(InMemoryDocumentStore())
+        services, drain = make_services(InMemoryDocumentStore())
         answer = AnswerQuestion(
             search=services.search, chat=ScriptedChatModel(script), timeout_seconds=0.05
         )
         services = dataclasses.replace(services, answer=answer)
-        self.http = TestClient(create_app(make_settings(), services=services))
+        app = create_app(make_settings(), services=services)
+        app.state.drain = drain  # upload() runs queued ingestion jobs through it
+        self.http = TestClient(app)
 
 
 def test_answer_returns_text_and_citations_with_source_metadata() -> None:
@@ -105,7 +107,7 @@ def test_question_without_words_is_422() -> None:
 
 
 def test_answers_return_503_when_no_model_is_configured() -> None:
-    services = make_services(InMemoryDocumentStore())
+    services, _ = make_services(InMemoryDocumentStore())
     with TestClient(create_app(make_settings(), services=services)) as http:
         response = http.post("/v1/answers", headers=STAFF, json=QUESTION)
 

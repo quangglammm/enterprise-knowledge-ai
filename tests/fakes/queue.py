@@ -30,8 +30,10 @@ class InMemoryJobQueue:
         self._visibility = visibility_seconds
         self._clock = clock
         self._receipts = itertools.count(1)
+        self.enqueued: list[tuple[JobId, float]] = []  # (job, delay) of every enqueue
 
     async def enqueue(self, job_id: JobId, *, delay_seconds: float = 0.0) -> None:
+        self.enqueued.append((job_id, delay_seconds))
         self._messages.append(_Message(job_id=job_id, available_at=self._clock() + delay_seconds))
 
     async def receive(self, *, max_messages: int, wait_seconds: float) -> list[QueueMessage]:

@@ -125,3 +125,25 @@ def test_hybrid_retrieval_reads_its_settings(monkeypatch: pytest.MonkeyPatch) ->
 def test_invalid_retrieval_settings_fail_clearly(field: str, value: object) -> None:
     with pytest.raises(ValidationError, match=field):
         settings(**{field: value})
+
+
+def test_job_settings_have_bounded_retry_defaults() -> None:
+    defaults = settings()
+
+    assert defaults.job_max_attempts == 3
+    assert (defaults.job_retry_base_seconds, defaults.job_retry_max_seconds) == (10.0, 300.0)
+    assert defaults.job_visibility_seconds == 300.0
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"job_max_attempts": 0},
+        {"job_max_attempts": 11},
+        {"job_retry_base_seconds": 60, "job_retry_max_seconds": 30},
+    ],
+    ids=["no-attempts", "unbounded", "cap-below-base"],
+)
+def test_invalid_job_settings_fail_clearly(values: dict[str, object]) -> None:
+    with pytest.raises(ValidationError, match="job_"):
+        settings(**values)

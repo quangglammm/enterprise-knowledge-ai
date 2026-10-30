@@ -1,4 +1,9 @@
-"""/v1 document upload, inspection and search (vertical slice v0.1)."""
+"""/v1 document upload, inspection and search.
+
+Uploads are accepted as ingestion jobs (JOB-01): 202 with the job, which the worker then
+processes; ``GET /v1/jobs/{id}`` reports its progress. An identical upload of an indexed
+version returns 200 with that version and no job.
+"""
 
 from typing import Annotated, Any
 
@@ -7,6 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from enterprise_knowledge.api.errors import ForbiddenError
 from enterprise_knowledge.api.identity import current_principal
+from enterprise_knowledge.api.routes.jobs import JobOut
 from enterprise_knowledge.api.services import Services, get_services
 from enterprise_knowledge.domain.access import AccessPolicy, Principal
 from enterprise_knowledge.domain.documents import Document, DocumentChunk, DocumentStatus
@@ -51,7 +57,7 @@ class DocumentOut(BaseModel):
 
 class UploadOut(BaseModel):
     document: DocumentOut
-    chunk_count: int
+    job: JobOut | None  # None only for a duplicate of an indexed version
     duplicate: bool
 
 
@@ -116,7 +122,7 @@ class SearchOut(BaseModel):
 
 @router.post(
     "/documents",
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_202_ACCEPTED,
     responses={
         200: {"model": UploadOut, "description": "Identical document already indexed"},
         **_ERRORS,
@@ -139,18 +145,18 @@ async def upload_document(
     if len(data) > services.max_upload_bytes:
         raise DocumentTooLargeError(f"upload exceeds {services.max_upload_bytes} bytes")
 
-    result = await services.ingest(
+    result = await services.submit(
         data=data,
         filename=file.filename or "upload",
         access=access,
         document_id=DocumentId(document_id) if document_id else None,
         title=title,
     )
-    if result.duplicate:
+    if result.job is None:
         response.status_code = status.HTTP_200_OK
     return UploadOut(
         document=DocumentOut.of(result.document),
-        chunk_count=result.chunk_count,
+        job=JobOut.of(result.job) if result.job else None,
         duplicate=result.duplicate,
     )
 

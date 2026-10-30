@@ -1,10 +1,12 @@
 """HTTP behavior of /v1 documents and search, with in-memory adapters."""
 
-from collections.abc import Iterator
+import asyncio
+from collections.abc import Awaitable, Callable, Iterator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr, ValidationError
 
@@ -14,12 +16,15 @@ from enterprise_knowledge.config import Environment, Settings
 from enterprise_knowledge.domain.documents import Document
 from enterprise_knowledge.domain.errors import DocumentAlreadyExistsError
 from enterprise_knowledge.ingestion.delete import DeleteDocument
-from enterprise_knowledge.ingestion.ingest import IngestDocument
+from enterprise_knowledge.ingestion.jobs import ProcessIngestionJob, SubmitDocument
 from enterprise_knowledge.ingestion.limits import IngestionLimits
 from enterprise_knowledge.retrieval.search import SearchKnowledge
+from enterprise_knowledge.worker.loop import IngestionWorker
 from tests.fakes.blob_store import InMemoryBlobStore
 from tests.fakes.document_store import InMemoryDocumentStore
 from tests.fakes.embedder import HashEmbedder
+from tests.fakes.job_store import InMemoryJobStore
+from tests.fakes.queue import InMemoryJobQueue
 from tests.unit.ingestion.conftest import fixture_bytes
 
 TENANT = "bamboo-harbor"
@@ -39,27 +44,52 @@ def make_settings(**overrides: object) -> Settings:
     return Settings.model_validate(values)
 
 
-def make_services(store: InMemoryDocumentStore) -> Services:
+Drain = Callable[[], Awaitable[None]]
+
+
+def make_services(store: InMemoryDocumentStore) -> tuple[Services, Drain]:
+    """Services on fakes, plus a function that runs every queued job like the worker."""
     embedder = HashEmbedder()
     blobs = InMemoryBlobStore()
-    return Services(
+    jobs = InMemoryJobStore()
+    queue = InMemoryJobQueue()
+    worker = IngestionWorker(
+        queue=queue,
+        process=ProcessIngestionJob(documents=store, jobs=jobs, blobs=blobs, embedder=embedder),
+        wait_seconds=0,
+    )
+
+    async def drain() -> None:
+        while await worker.run_once():
+            pass
+
+    services = Services(
         documents=store,
-        ingest=IngestDocument(
+        submit=SubmitDocument(
             documents=store,
-            embedder=embedder,
+            jobs=jobs,
+            queue=queue,
             blobs=blobs,
             limits=IngestionLimits(max_bytes=MAX_UPLOAD),
         ),
+        jobs=jobs,
         delete=DeleteDocument(documents=store, blobs=blobs),
         search=SearchKnowledge(search=store, embedder=embedder),
         max_upload_bytes=MAX_UPLOAD,
     )
+    return services, drain
+
+
+def make_client(store: InMemoryDocumentStore) -> TestClient:
+    services, drain = make_services(store)
+    app = create_app(make_settings(), services=services)
+    app.state.drain = drain
+    return TestClient(app)
 
 
 @pytest.fixture
 def client() -> Iterator[TestClient]:
-    services = make_services(InMemoryDocumentStore())
-    with TestClient(create_app(make_settings(), services=services)) as test_client:
+    with make_client(InMemoryDocumentStore()) as test_client:
         yield test_client
 
 
@@ -76,15 +106,26 @@ def upload(
     data: bytes = PDF,
     filename: str = "leave-policy.pdf",
     groups: str = "all-staff",
+    process: bool = True,
     **form: str,
 ) -> Result:
+    """Upload, then (unless ``process`` is False) run the queued jobs as the worker would."""
     response = client.post(
         "/v1/documents",
         headers=headers,
         files={"file": (filename, data)},
         data={"allowed_groups": groups, **form},
     )
+    if process and response.status_code == 202:
+        asyncio.run(cast(FastAPI, client.app).state.drain())
     return Result(response.status_code, response.json(), response.headers["x-request-id"])
+
+
+def job_status(client: TestClient, headers: dict[str, str], job_id: str) -> dict[str, Any]:
+    response = client.get(f"/v1/jobs/{job_id}", headers=headers)
+    assert response.status_code == 200, response.text
+    body: dict[str, Any] = response.json()
+    return body
 
 
 def assert_error(result: Result, status: int, category: str) -> None:
@@ -96,19 +137,20 @@ def assert_error(result: Result, status: int, category: str) -> None:
 # --- happy path ----------------------------------------------------------------------
 
 
-def test_upload_inspect_and_search(client: TestClient) -> None:
+def test_upload_is_accepted_as_a_job_then_inspect_and_search(client: TestClient) -> None:
     created = upload(client, STAFF)
 
-    assert created.status == 201
+    assert created.status == 202
     body = created.body
-    document = body["document"]
-    assert (document["version"], document["status"], document["language"]) == (1, "indexed", "vi")
-    assert document["title"] == "Quy chế nghỉ phép"
-    assert body["chunk_count"] > 0
+    assert (body["document"]["version"], body["document"]["status"]) == (1, "pending")
+    assert (body["job"]["status"], body["job"]["attempts"]) == ("queued", 0)
     assert body["duplicate"] is False
 
-    doc_id = document["id"]
-    assert client.get(f"/v1/documents/{doc_id}", headers=STAFF).json()["id"] == doc_id
+    doc_id = body["document"]["id"]
+    assert job_status(client, STAFF, body["job"]["id"])["status"] == "succeeded"
+    document = client.get(f"/v1/documents/{doc_id}", headers=STAFF).json()
+    assert (document["status"], document["language"]) == ("indexed", "vi")
+    assert document["title"] == "Quy chế nghỉ phép"
     chunks = client.get(f"/v1/documents/{doc_id}/chunks", headers=STAFF).json()
     assert chunks[0]["section"] == "Điều 1. Phạm vi áp dụng"
     assert [c["index"] for c in chunks] == list(range(len(chunks)))
@@ -126,7 +168,26 @@ def test_identical_upload_returns_200_and_existing_document(client: TestClient) 
 
     assert second.status == 200
     assert second.body["duplicate"] is True
-    assert second.body["document"] == first.body["document"]
+    assert second.body["job"] is None
+    assert second.body["document"]["id"] == first.body["document"]["id"]
+    assert second.body["document"]["status"] == "indexed"
+
+
+def test_identical_upload_while_pending_returns_the_same_job(client: TestClient) -> None:
+    first = upload(client, STAFF, process=False)
+    second = upload(client, STAFF, process=False)
+
+    assert second.status == 202
+    assert second.body["duplicate"] is True
+    assert second.body["job"]["id"] == first.body["job"]["id"]
+
+
+def test_pending_upload_is_not_searchable_yet(client: TestClient) -> None:
+    upload(client, STAFF, process=False)
+
+    search = client.post("/v1/search", headers=STAFF, json={"query": "nghỉ phép năm"})
+
+    assert search.json()["results"] == []
 
 
 def test_new_version_of_existing_document(client: TestClient) -> None:
@@ -136,7 +197,7 @@ def test_new_version_of_existing_document(client: TestClient) -> None:
         client, STAFF, data=fixture_bytes("onboarding-vi.md"), filename="v2.md", document_id=doc_id
     )
 
-    assert result.status == 201
+    assert result.status == 202
     assert result.body["document"]["version"] == 2
 
 
@@ -180,8 +241,7 @@ class _LosesVersionRace(InMemoryDocumentStore):
 
 
 def test_concurrent_new_version_upload_is_409() -> None:
-    services = make_services(_LosesVersionRace())
-    with TestClient(create_app(make_settings(), services=services)) as racing:
+    with make_client(_LosesVersionRace()) as racing:
         doc_id = upload(racing, STAFF).body["document"]["id"]
 
         result = upload(racing, STAFF, filename="x.md", data=b"# T\n\ntext", document_id=doc_id)
@@ -240,8 +300,31 @@ def test_missing_or_invalid_identity_is_401(client: TestClient, headers: dict[st
 # --- input errors --------------------------------------------------------------------
 
 
-def test_corrupt_upload_is_422_with_category(client: TestClient) -> None:
-    assert_error(upload(client, STAFF, data=b"%PDF-1.7 broken"), 422, "corrupt_document")
+def test_corrupt_upload_fails_its_job_with_a_category(client: TestClient) -> None:
+    accepted = upload(client, STAFF, data=b"%PDF-1.7 broken")
+
+    assert accepted.status == 202
+    job = job_status(client, STAFF, accepted.body["job"]["id"])
+    assert (job["status"], job["error_category"]) == ("failed", "corrupt_document")
+    document = client.get(f"/v1/documents/{job['document_id']}", headers=STAFF).json()
+    assert (document["status"], document["error_category"]) == ("failed", "corrupt_document")
+
+
+def test_job_status_is_hidden_from_other_groups_and_tenants(client: TestClient) -> None:
+    job_id = upload(client, HR, groups="hr").body["job"]["id"]
+
+    for headers in (STAFF, OTHER_TENANT):
+        response = client.get(f"/v1/jobs/{job_id}", headers=headers)
+        assert response.status_code == 404
+        assert response.json()["error"]["category"] == "job_not_found"
+    assert job_status(client, HR, job_id)["status"] == "succeeded"
+
+
+def test_unknown_job_is_404(client: TestClient) -> None:
+    response = client.get("/v1/jobs/nope", headers=STAFF)
+
+    assert response.status_code == 404
+    assert response.json()["error"]["category"] == "job_not_found"
 
 
 def test_unsupported_format_is_415(client: TestClient) -> None:

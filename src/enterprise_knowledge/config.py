@@ -74,6 +74,15 @@ class Settings(BaseSettings):
     rrf_k: int = Field(default=60, ge=1)
     hybrid_candidates: int = Field(default=50, ge=1, le=200)
 
+    # Ingestion jobs (JOB-01, ADR-0016). Attempts include the first; a retry waits
+    # base * 2^(attempt-1) seconds, capped and jittered. A message not acked within the
+    # visibility timeout is delivered again, so it must exceed the slowest ingestion.
+    job_max_attempts: int = Field(default=3, ge=1, le=10)
+    job_retry_base_seconds: float = Field(default=10.0, gt=0)
+    job_retry_max_seconds: float = Field(default=300.0, gt=0)
+    job_visibility_seconds: float = Field(default=300.0, ge=30)
+    worker_wait_seconds: float = Field(default=10.0, ge=0)
+
     answer_top_k: int = Field(default=5, ge=1, le=20)
     # Evidence scoring below this is not sent to the model; None disables the gate until
     # Week 4 calibrates it on the benchmark.
@@ -93,6 +102,12 @@ class Settings(BaseSettings):
 
     api_host: str = "127.0.0.1"
     api_port: int = Field(default=8000, ge=1, le=65535)
+
+    @model_validator(mode="after")
+    def _job_backoff_is_ordered(self) -> Self:
+        if self.job_retry_max_seconds < self.job_retry_base_seconds:
+            raise ValueError("job_retry_max_seconds must be at least job_retry_base_seconds")
+        return self
 
     @model_validator(mode="after")
     def _model_providers_are_complete(self) -> Self:
