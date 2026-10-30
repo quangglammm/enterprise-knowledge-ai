@@ -45,6 +45,7 @@ from enterprise_knowledge.infrastructure.postgres.store import PostgresDocumentS
 from enterprise_knowledge.retrieval.search import SearchKnowledge
 
 ROOT = Path(__file__).resolve().parents[1]
+REPORTS_DIR = "docs/evaluation/"
 
 
 def parse_args() -> argparse.Namespace:
@@ -91,7 +92,13 @@ def code_revision() -> str | None:
         )
     except (OSError, subprocess.CalledProcessError):
         return None
-    return head.stdout.decode().strip() + ("-dirty" if status.stdout.strip() else "")
+    # Reports from earlier runs are outputs, not code: they do not make a run dirty.
+    changed = [
+        line[3:]
+        for line in status.stdout.decode().splitlines()
+        if not line[3:].startswith(REPORTS_DIR)
+    ]
+    return head.stdout.decode().strip() + ("-dirty" if changed else "")
 
 
 def print_report(report: BenchmarkReport) -> None:
@@ -188,7 +195,7 @@ async def main() -> int:
             await client.aclose()
 
     print_report(report)
-    out = args.out or ROOT / "docs" / "evaluation" / (
+    out = args.out or ROOT / REPORTS_DIR / (
         f"benchmark-{report.dataset_version}-{experiment.name}-{provider}-"
         f"{datetime.now(UTC):%Y%m%d-%H%M%S}.json"
     )
