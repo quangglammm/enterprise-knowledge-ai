@@ -30,6 +30,11 @@ CHUNKING = ChunkingSettings()  # the ingestion defaults: 1200 characters, 150 ov
 VERSIONS = ("v1", "v2")
 
 
+def chunking_record(chunking: ChunkingSettings) -> dict[str, Any]:
+    """Settings as pinned in benchmark.json; packing is omitted when off, as v1 and v2 pin it."""
+    return chunking.model_dump(exclude=set() if chunking.pack_sections else {"pack_sections"})
+
+
 def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", unicodedata.normalize("NFC", text)).strip()
 
@@ -121,7 +126,7 @@ def write_questions(data: ModuleType, version: str, corpus: Path, benchmark: Pat
         "corpus_manifest_sha256": hashlib.sha256(
             (corpus / "manifest.jsonl").read_bytes()
         ).hexdigest(),
-        "chunking": CHUNKING.model_dump(),
+        "chunking": chunking_record(CHUNKING),
     }
     (benchmark / "benchmark.json").write_text(
         json.dumps(metadata, indent=2) + "\n", encoding="utf-8"

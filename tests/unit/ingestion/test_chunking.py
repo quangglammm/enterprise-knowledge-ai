@@ -19,6 +19,7 @@ from tests.factories import make_document, make_policy
 from tests.unit.ingestion.conftest import fixture_bytes
 
 SMALL = ChunkingSettings(max_chars=200, overlap_chars=60)
+PACKED_SMALL = ChunkingSettings(max_chars=200, overlap_chars=60, pack_sections=True)
 
 
 def parsed_fixture(name: str, content_type: ContentType) -> ParsedDocument:
@@ -48,7 +49,9 @@ ALL_FIXTURES = [
 
 
 @pytest.mark.parametrize(("name", "content_type"), ALL_FIXTURES)
-@pytest.mark.parametrize("settings", [ChunkingSettings(), SMALL], ids=["default", "small"])
+@pytest.mark.parametrize(
+    "settings", [ChunkingSettings(), SMALL, PACKED_SMALL], ids=["default", "small", "packed"]
+)
 def test_chunk_text_is_an_exact_slice_of_normalized_text(
     name: str, content_type: ContentType, settings: ChunkingSettings
 ) -> None:
@@ -71,11 +74,12 @@ def test_chunking_is_deterministic(name: str, content_type: ContentType) -> None
 
 
 @pytest.mark.parametrize(("name", "content_type"), ALL_FIXTURES)
+@pytest.mark.parametrize("settings", [SMALL, PACKED_SMALL], ids=["small", "packed"])
 def test_every_body_block_is_covered_and_every_heading_survives(
-    name: str, content_type: ContentType
+    name: str, content_type: ContentType, settings: ChunkingSettings
 ) -> None:
     parsed = parsed_fixture(name, content_type)
-    text, drafts = chunk_document(parsed, SMALL)
+    text, drafts = chunk_document(parsed, settings)
     covered = [False] * len(text)
     for draft in drafts:
         covered[draft.char_start : draft.char_end] = [True] * (draft.char_end - draft.char_start)
@@ -245,11 +249,67 @@ def test_consecutive_headings_merge_into_the_following_chunk() -> None:
 
 
 @pytest.mark.parametrize(("name", "content_type"), ALL_FIXTURES)
-def test_no_chunk_is_only_headings(name: str, content_type: ContentType) -> None:
+@pytest.mark.parametrize("settings", [SMALL, PACKED_SMALL], ids=["small", "packed"])
+def test_no_chunk_is_only_headings(
+    name: str, content_type: ContentType, settings: ChunkingSettings
+) -> None:
     parsed = parsed_fixture(name, content_type)
     headings = {b.text for b in parsed.blocks if b.kind is BlockKind.HEADING}
 
-    _, drafts = chunk_document(parsed, SMALL)
+    _, drafts = chunk_document(parsed, settings)
 
     for draft in drafts:
         assert not set(draft.text.split("\n\n")) <= headings, draft.text
+
+
+# --- section packing (opt-in) --------------------------------------------------------
+
+THREE_SHORT_SECTIONS = (
+    (BlockKind.HEADING, "Leave", "Leave"),
+    (BlockKind.PARAGRAPH, "Staff get 14 days.", "Leave"),
+    (BlockKind.HEADING, "Carry-over", "Carry-over"),
+    (BlockKind.PARAGRAPH, "Up to 3 days carry over.", "Carry-over"),
+    (BlockKind.HEADING, "Requests", "Requests"),
+    (BlockKind.PARAGRAPH, "Ask 3 days ahead.", "Requests"),
+)
+
+
+def test_section_packing_is_off_by_default() -> None:
+    _, drafts = chunk_document(doc(*THREE_SHORT_SECTIONS), ChunkingSettings())
+
+    assert not ChunkingSettings().pack_sections
+    assert [d.section for d in drafts] == ["Leave", "Carry-over", "Requests"]
+
+
+def test_packing_puts_short_sections_that_fit_into_one_chunk() -> None:
+    _, drafts = chunk_document(doc(*THREE_SHORT_SECTIONS), PACKED_SMALL)
+
+    assert [d.text for d in drafts] == [
+        "Leave\n\nStaff get 14 days.\n\nCarry-over\n\nUp to 3 days carry over."
+        "\n\nRequests\n\nAsk 3 days ahead."
+    ]
+    assert drafts[0].section == "Leave"  # the section where the chunk starts
+
+
+def test_packing_starts_a_new_chunk_when_the_whole_next_section_does_not_fit() -> None:
+    body = sentences(2)  # about 100 characters
+    parsed = doc(
+        (BlockKind.HEADING, "First", "First"),
+        (BlockKind.PARAGRAPH, body, "First"),
+        (BlockKind.HEADING, "Second", "Second"),
+        (BlockKind.PARAGRAPH, body, "Second"),
+    )
+
+    _, drafts = chunk_document(parsed, PACKED_SMALL)
+
+    assert [d.section for d in drafts] == ["First", "Second"]
+    assert [d.text.split("\n\n")[0] for d in drafts] == ["First", "Second"]
+
+
+def test_packing_splits_a_long_section_like_the_default() -> None:
+    parsed = doc(
+        (BlockKind.HEADING, "Long", "Long"),
+        (BlockKind.PARAGRAPH, sentences(12), "Long"),
+    )
+
+    assert chunk_document(parsed, PACKED_SMALL)[1] == chunk_document(parsed, SMALL)[1]

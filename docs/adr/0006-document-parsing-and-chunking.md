@@ -47,3 +47,12 @@ ING-01 and ING-02 need deterministic text extraction from PDF, DOCX, HTML and Ma
 - Scanned PDFs yield `empty_document`. OCR stays out of scope.
 - Chunks after the first in a section do not contain the section heading. At indexing time (Week 3), the embedding input is `title › section › chunk text` (a contextual header), while the stored chunk text remains the exact slice used for citations. Week 4 measures the effect.
 - Revisit chunk sizes in Week 4 using Recall@k and MRR, not intuition.
+
+## Amendment (2026-10-30): opt-in section packing
+
+Week 4 found that `max_chars` barely changes corpus v2: from 400 to 3000 characters, only 1 to 4 of its 49 documents chunk differently. Because a heading always starts a chunk and most sections are short, v2 averages 237 characters per chunk. `ChunkingSettings.pack_sections` (default `False`) gives the comparison a lever that does change the chunks:
+- **Rule:** a section run (consecutive headings plus their body) joins the current chunk only if the whole run fits within `max_chars`. Otherwise the heading starts a new chunk, as before. Long sections split exactly as in the default mode. Overlap still never crosses a section boundary.
+- **Effect on v2:** 219 chunks become 71 at 1200 characters (mean 737) and 96 at 800.
+- **Chunk section:** a chunk's `section` is now the section of its first body unit, i.e. where the chunk starts. Default-mode output is unchanged (v1 and v2 labels rebuild byte-identical).
+
+The default stays off until the Week 4 benchmark shows packing helps (ADR-0013).

@@ -39,6 +39,9 @@ class ChunkingSettings(BaseModel):
 
     max_chars: int = Field(default=1200, ge=100)
     overlap_chars: int = Field(default=150, ge=0)
+    # Opt-in (ADR-0006 amendment): a heading starts a new chunk only when its whole section
+    # does not fit beside the current one, so short sections share a chunk.
+    pack_sections: bool = False
 
     @model_validator(mode="after")
     def _overlap_leaves_room(self) -> Self:
@@ -89,7 +92,7 @@ def chunk_document(
                 char_start=start,
                 char_end=end,
                 page=group[0].page,
-                section=group[-1].section,
+                section=next((u.section for u in group if not u.heading), group[-1].section),
                 language=detect_language(chunk_text),
             )
         )
@@ -169,10 +172,24 @@ def _fit(text: str, start: int, end: int, max_chars: int) -> list[tuple[int, int
 
 
 def _pack(units: list[_Unit], settings: ChunkingSettings) -> list[list[_Unit]]:
+    run_ends = _section_run_ends(units) if settings.pack_sections else {}
     groups: list[list[_Unit]] = []
     current: list[_Unit] = []
-    for unit in units:
+    absorb_until = -1
+    for i, unit in enumerate(units):
         if current:
+            if unit.end <= absorb_until:
+                current.append(unit)  # inside a section already known to fit
+                continue
+            run_end = run_ends.get(i)
+            if (
+                run_end is not None
+                and not all(u.heading for u in current)
+                and run_end - current[0].start <= settings.max_chars
+            ):
+                absorb_until = run_end
+                current.append(unit)
+                continue
             headings_only = all(u.heading for u in current)
             too_long = unit.end - current[0].start > settings.max_chars
             if unit.starts_section and headings_only and not too_long:
@@ -190,6 +207,15 @@ def _pack(units: list[_Unit], settings: ChunkingSettings) -> list[list[_Unit]]:
     if current and (not all(u.heading for u in current) or not groups):
         groups.append(current)
     return groups
+
+
+def _section_run_ends(units: list[_Unit]) -> dict[int, int]:
+    """For each unit that opens a section run (headings plus their body), where the run ends."""
+    starts = [
+        i for i, u in enumerate(units) if u.starts_section and (i == 0 or not units[i - 1].heading)
+    ]
+    ends = [units[j - 1].end for j in starts[1:]] + [units[-1].end] if starts else []
+    return dict(zip(starts, ends, strict=True))
 
 
 def _overlap(previous: list[_Unit], unit: _Unit, settings: ChunkingSettings) -> list[_Unit]:
