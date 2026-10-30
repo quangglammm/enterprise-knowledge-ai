@@ -66,5 +66,5 @@ Postgres and pgvector, chunking 1200/150, all 50 questions. Reports are in `docs
 - **v1 saturates.** With 72 chunks, fewer visible per principal, a real embedder reaches 100% Recall@3, so v1 cannot separate the Week 4 retrieval variants. It validates the pipeline, the labels and access filtering. Corpus v2 is a prerequisite for Week 4 comparisons; it needs about 50 documents, at least 5 version pairs, at least 10 restricted documents, harder distractors and near-duplicates, and openly licensed public documents.
 - **The hashing baseline is free and deterministic**, which makes it a candidate for a CI regression check (CI-01). It measures the pipeline, never quality.
 - **Score gap for the evidence gate:** answerable questions' top scores (0.54) sit well above unanswerable ones (0.35) with FPT embeddings. This is a starting point for calibrating `EKA_ANSWER_MIN_SCORE` in Week 4, not a chosen threshold.
-- **Human review is still owed:** per ADR-0005, a person must still check the facts behind the reference answers and labels. Until then they are author-checked only.
+- **Human review done (2026-10-30):** per ADR-0005, a person checked the 50 ground-truth facts behind the reference answers and labels (now in `scripts/benchmark_data/v1.py`); all were accepted unchanged.
 - **Answer quality is not measured here:** the reference answers are stored for EVAL-02.

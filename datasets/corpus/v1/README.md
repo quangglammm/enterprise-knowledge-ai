@@ -15,4 +15,4 @@ Fictional documents for two fictional companies, Bamboo Harbor Logistics (`bambo
 
 The first four files are copies of the parser fixtures in `datasets/fixtures/`.
 
-Ground-truth facts were written and checked by the author. ADR-0005 also asks for a review by another person, which is still pending.
+Ground-truth facts were written and checked by the author, then reviewed by a person on 2026-10-30 as ADR-0005 requires; all were accepted unchanged.
