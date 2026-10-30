@@ -1,0 +1,7 @@
+# Production retrieval settings on benchmark v2: section-per-chunk at 1200/150, with the
+# "title > section" embedding header (ADR-0006, ADR-0012).
+name = "baseline"
+description = "Production settings: section-per-chunk chunking, embedding header on."
+corpus = "v2"
+benchmark = "v2"
+embedding = "fpt"

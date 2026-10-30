@@ -1,0 +1,7 @@
+# Section packing (ADR-0006 amendment): short sections share a chunk up to 1200 characters.
+# Labels come from the derived set v2-packed1200 (ADR-0013).
+name = "packed-1200"
+description = "Section packing at 1200/150: 219 chunks become 71."
+corpus = "v2"
+benchmark = "v2-packed1200"
+embedding = "fpt"

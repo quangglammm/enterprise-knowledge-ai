@@ -42,6 +42,8 @@ curl -i http://localhost:8000/health/ready
 | Integration tests | `docker compose up -d postgres` then `EKA_TEST_DATABASE_URL=postgresql://eka:eka@localhost:5432/eka_test uv run pytest -m integration` |
 | Apply migrations | `uv run eka-migrate` |
 | Retrieval benchmark | `uv run python scripts/run_benchmark.py --database-url postgresql://eka:eka@localhost:5432/eka_test` (wipes that database; add `--embedding fpt` for real retrieval, paid) |
+| Retrieval experiment | `uv run python scripts/run_benchmark.py --database-url ... --experiment experiments/week4/packed-1200.toml` (add `--embedding hashing` for a free dry run) |
+| Compare reports | `uv run python scripts/compare_reports.py <baseline.json> <candidate.json> ...` |
 | Add a dependency | `uv add <pkg>` (dev: `uv add --dev <pkg>`) |
 
 CI runs the same checks on every pull request (`.github/workflows/ci.yml`).
@@ -133,8 +135,10 @@ datasets/
   benchmark/v1/   50 labelled retrieval questions (ADR-0011)
   corpus/v2/      superset of v1 with distractors and 2 public documents (49 documents)
   benchmark/v2/   115 labelled retrieval questions (ADR-0012); the scripts default to v2
+  benchmark/v2-packed*/  the same questions labelled under section packing (ADR-0013)
   model_trial/    versioned grounded-answer cases for the ADR-0004 model trial
-scripts/          fixtures, benchmark builder and runner, chunk viewer, FPT smoke test, model trial
+experiments/      versioned retrieval experiment configurations (ADR-0013)
+scripts/          fixtures, benchmark builder, runner and report comparison, chunk viewer, FPT smoke test, model trial
 docs/
   adr/            architecture decision records
   evaluation/     recorded trial and benchmark results (no answer text)
@@ -172,6 +176,7 @@ More packages (`agents`, `worker`) are added when their first feature lands, rat
 - [ADR-0010: FPT model adapters: transport, retries and errors](docs/adr/0010-fpt-model-adapters.md)
 - [ADR-0011: Benchmark v1: corpus, chunk-ID labels and retrieval metrics](docs/adr/0011-benchmark-v1.md)
 - [ADR-0012: Benchmark v2: superset corpus with hard distractors and public documents](docs/adr/0012-benchmark-v2.md)
+- [ADR-0013: Retrieval experiments: versioned configurations and derived label sets](docs/adr/0013-retrieval-experiments.md)
 
 ## Data
 

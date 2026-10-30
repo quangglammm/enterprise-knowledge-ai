@@ -1,16 +1,24 @@
-"""Run the EVAL-01 retrieval benchmark on Postgres (ADR-0011).
+"""Run the retrieval benchmark on Postgres (ADR-0011), optionally as an experiment (ADR-0013).
 
     uv run python scripts/run_benchmark.py --database-url postgresql://eka:eka@localhost:5432/eka_test
     uv run python scripts/run_benchmark.py --database-url ... --embedding fpt   # paid calls
+    uv run python scripts/run_benchmark.py --database-url ... \
+        --experiment experiments/week4/baseline.toml
 
 Migrates and WIPES the given database, indexes the corpus (default v2) through the production
 ingestion path with stable document IDs, runs every question as its principal, and writes a
 report to docs/evaluation/. Refuses to touch the app database (EKA_DATABASE_URL). The hashing
 embedder measures the pipeline only; real retrieval quality needs --embedding fpt.
+
+Every report records its experiment configuration and the git revision. Without
+--experiment, the flags form an ad-hoc configuration; with it, --embedding still overrides
+the embedder, for a free hashing dry run of a paid experiment.
 """
 
 import argparse
 import asyncio
+import shutil
+import subprocess
 import sys
 import tempfile
 from datetime import UTC, datetime
@@ -27,6 +35,7 @@ from enterprise_knowledge.evaluation.benchmark import (
     load_corpus,
     run_retrieval_benchmark,
 )
+from enterprise_knowledge.evaluation.experiment import ExperimentConfig, load_experiment
 from enterprise_knowledge.infrastructure.blobs import LocalBlobStore
 from enterprise_knowledge.infrastructure.embeddings.hashing import HashingEmbedder
 from enterprise_knowledge.infrastructure.fpt.client import FptClient, RetryPolicy
@@ -46,11 +55,43 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--embedding", choices=["hashing", "fpt"], help="default: EKA_EMBEDDING_PROVIDER"
     )
-    parser.add_argument("--k", default="1,3,5,10", help="comma-separated k values")
-    parser.add_argument("--corpus", type=Path, default=ROOT / "datasets" / "corpus" / "v2")
-    parser.add_argument("--benchmark", type=Path, default=ROOT / "datasets" / "benchmark" / "v2")
+    parser.add_argument("--experiment", type=Path, help="experiment configuration (TOML)")
+    parser.add_argument("--k", default="1,3,5,10", help="comma-separated k values (ad hoc)")
+    parser.add_argument("--corpus", default="v2", help="datasets/corpus/<name> (ad hoc)")
+    parser.add_argument("--benchmark", default="v2", help="datasets/benchmark/<name> (ad hoc)")
     parser.add_argument("--out", type=Path, help="report path (default: docs/evaluation/...)")
     return parser.parse_args()
+
+
+def experiment_for(args: argparse.Namespace, default_embedding: str) -> ExperimentConfig:
+    if args.experiment is not None:
+        config = load_experiment(args.experiment)
+        return config.model_copy(update={"embedding": args.embedding}) if args.embedding else config
+    return ExperimentConfig(
+        name="ad-hoc",
+        corpus=args.corpus,
+        benchmark=args.benchmark,
+        embedding=args.embedding or default_embedding,
+        k_values=tuple(int(k) for k in args.k.split(",")),
+    )
+
+
+def code_revision() -> str | None:
+    """The commit the run used, marked dirty when the working tree has changes."""
+    git = shutil.which("git")
+    if git is None:
+        return None
+    try:
+        # Fixed arguments and a resolved git binary: no untrusted input reaches the call.
+        head = subprocess.run(  # noqa: S603
+            [git, "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, check=True
+        )
+        status = subprocess.run(  # noqa: S603
+            [git, "status", "--porcelain"], cwd=ROOT, capture_output=True, check=True
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return head.stdout.decode().strip() + ("-dirty" if status.stdout.strip() else "")
 
 
 def print_report(report: BenchmarkReport) -> None:
@@ -59,7 +100,9 @@ def print_report(report: BenchmarkReport) -> None:
 
     ks = report.k_values
     print(
-        f"\nbenchmark {report.dataset_version} | embedding {report.embedding_model} | "
+        f"\nbenchmark {report.dataset_version} | "
+        f"experiment {report.experiment.name if report.experiment else 'n/a'} | "
+        f"embedding {report.embedding_model} | "
         f"{report.questions} questions ({report.answerable} answerable) | "
         f"access violations {report.access_violations}"
     )
@@ -89,10 +132,13 @@ async def main() -> int:
     if args.database_url.strip() == settings.database_url.get_secret_value().strip():
         print("refusing to wipe the app database (EKA_DATABASE_URL); pass a disposable database")
         return 2
-    provider = args.embedding or settings.embedding_provider
-    ks = [int(k) for k in args.k.split(",")]
+    experiment = experiment_for(args, settings.embedding_provider)
+    provider = experiment.embedding
 
-    dataset = load_benchmark(args.benchmark, load_corpus(args.corpus))
+    dataset = load_benchmark(
+        ROOT / "datasets" / "benchmark" / experiment.benchmark,
+        load_corpus(ROOT / "datasets" / "corpus" / experiment.corpus),
+    )
     migrate(args.database_url)
     wipe_documents(args.database_url)
 
@@ -126,12 +172,15 @@ async def main() -> int:
                 embedder=embedder,
                 blobs=LocalBlobStore(Path(blob_dir)),
                 chunking=dataset.chunking,
+                embedding_header=experiment.embedding_header,
             )
         report = await run_retrieval_benchmark(
             dataset,
             SearchKnowledge(search=store, embedder=embedder),
-            k_values=ks,
+            k_values=experiment.k_values,
             embedding_model=embedder.model,
+            experiment=experiment,
+            code_revision=code_revision(),
         )
     finally:
         await store.close()
@@ -140,7 +189,8 @@ async def main() -> int:
 
     print_report(report)
     out = args.out or ROOT / "docs" / "evaluation" / (
-        f"benchmark-{report.dataset_version}-{provider}-{datetime.now(UTC):%Y%m%d-%H%M%S}.json"
+        f"benchmark-{report.dataset_version}-{experiment.name}-{provider}-"
+        f"{datetime.now(UTC):%Y%m%d-%H%M%S}.json"
     )
     dump_report(report, out)
     print(f"\nreport written to {out}")

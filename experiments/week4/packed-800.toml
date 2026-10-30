@@ -1,0 +1,6 @@
+# Section packing at a smaller budget: 96 chunks, between section-per-chunk and packed-1200.
+name = "packed-800"
+description = "Section packing at 800/100: 219 chunks become 96."
+corpus = "v2"
+benchmark = "v2-packed800"
+embedding = "fpt"

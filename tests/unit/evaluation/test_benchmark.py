@@ -20,6 +20,7 @@ from enterprise_knowledge.evaluation.benchmark import (
     load_corpus,
     run_retrieval_benchmark,
 )
+from enterprise_knowledge.evaluation.experiment import ExperimentConfig
 from enterprise_knowledge.retrieval.search import SearchKnowledge
 from tests.fakes.blob_store import InMemoryBlobStore
 from tests.fakes.document_store import InMemoryDocumentStore
@@ -283,6 +284,40 @@ async def test_run_scores_answerable_questions_and_separates_unanswerable(
     assert chunk_id_for(DocumentId("salary"), 1, 0) not in unanswerable.ranked
 
 
+async def test_report_records_the_experiment_and_code_revision(
+    dataset: BenchmarkDataset,
+) -> None:
+    store, embedder = await indexed(dataset)
+    experiment = ExperimentConfig(name="baseline", corpus="v1", benchmark="v1", embedding="hashing")
+
+    report = await run_retrieval_benchmark(
+        dataset,
+        SearchKnowledge(search=store, embedder=embedder),
+        experiment=experiment,
+        code_revision="abc1234",
+    )
+
+    assert report.experiment == experiment
+    assert report.code_revision == "abc1234"
+
+
+async def test_corpus_can_be_indexed_without_the_embedding_header(
+    dataset: BenchmarkDataset,
+) -> None:
+    store, embedder = InMemoryDocumentStore(), HashEmbedder()
+
+    await index_corpus(
+        dataset.corpus,
+        documents=store,
+        embedder=embedder,
+        blobs=InMemoryBlobStore(),
+        chunking=dataset.chunking,
+        embedding_header=False,
+    )
+
+    assert embedder.document_inputs[0] == "Leave policy\n\nEmployees get 12 days of annual leave."
+
+
 async def test_run_is_deterministic(dataset: BenchmarkDataset) -> None:
     store, embedder = await indexed(dataset)
     search = SearchKnowledge(search=store, embedder=embedder)
@@ -368,3 +403,19 @@ def test_benchmark_v2_keeps_every_v1_question_and_document() -> None:
     assert {(q.id, q.question, q.principal.model_dump_json()) for q in v1.questions} <= v2_questions
     v2_files = {(d.id, d.version, d.sha256) for d in v2.corpus.documents}
     assert {(d.id, d.version, d.sha256) for d in v1.corpus.documents} <= v2_files
+
+
+@pytest.mark.parametrize("label_set", ["v2-packed1200", "v2-packed800"])
+def test_derived_label_sets_cover_benchmark_v2_questions_under_their_chunking(
+    label_set: str,
+) -> None:
+    corpus = load_corpus(REPO / "datasets" / "corpus" / "v2")
+    base = load_benchmark(REPO / "datasets" / "benchmark" / "v2", corpus)
+
+    derived = load_benchmark(REPO / "datasets" / "benchmark" / label_set, corpus)
+
+    assert derived.version == label_set
+    assert derived.chunking.pack_sections
+    assert [(q.id, q.question, q.answerable) for q in derived.questions] == [
+        (q.id, q.question, q.answerable) for q in base.questions
+    ]

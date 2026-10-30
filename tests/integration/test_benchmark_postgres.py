@@ -31,13 +31,13 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 # version, then (questions, answerable, unanswerable, tenant-isolation questions)
-EXPECTED = {"v1": (50, 44, 6, 2), "v2": (115, 100, 15, 5)}
+EXPECTED = {"v1": (50, 44, 6, 2), "v2": (115, 100, 15, 5), "v2-packed800": (115, 100, 15, 5)}
 
 
 @pytest.fixture(scope="module", params=sorted(EXPECTED))
 def dataset(request: pytest.FixtureRequest) -> BenchmarkDataset:
     version: str = request.param
-    corpus = load_corpus(REPO / "datasets" / "corpus" / version)
+    corpus = load_corpus(REPO / "datasets" / "corpus" / version.split("-")[0])
     return load_benchmark(REPO / "datasets" / "benchmark" / version, corpus)
 
 

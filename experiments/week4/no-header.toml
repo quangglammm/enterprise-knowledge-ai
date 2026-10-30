@@ -1,0 +1,8 @@
+# Measures the contextual embedding header promised in ADR-0006: chunks are embedded as
+# their bare text. Queries are embedded the same way in both runs.
+name = "no-header"
+description = "Embedding header off: chunks embedded as bare text."
+corpus = "v2"
+benchmark = "v2"
+embedding = "fpt"
+embedding_header = false

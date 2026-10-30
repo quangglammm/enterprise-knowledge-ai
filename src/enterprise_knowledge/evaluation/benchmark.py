@@ -28,6 +28,7 @@ from enterprise_knowledge.domain.ids import (
     chunk_id_for,
 )
 from enterprise_knowledge.domain.ports import BlobStore, DocumentRepository, Embedder
+from enterprise_knowledge.evaluation.experiment import ExperimentConfig
 from enterprise_knowledge.evaluation.retrieval_metrics import mean, recall_at_k, reciprocal_rank
 from enterprise_knowledge.ingestion.chunking import ChunkingSettings
 from enterprise_knowledge.ingestion.ingest import IngestDocument
@@ -215,6 +216,9 @@ class BenchmarkReport(BaseModel):
     top_score_answerable_mean: float | None
     top_score_unanswerable_mean: float | None
     results: list[QuestionResult]
+    # How the run was produced (ADR-0013); absent in reports written before Week 4.
+    experiment: ExperimentConfig | None = None
+    code_revision: str | None = None
 
 
 def load_corpus(root: Path) -> Corpus:
@@ -276,6 +280,7 @@ async def index_corpus(
     embedder: Embedder,
     blobs: BlobStore,
     chunking: ChunkingSettings,
+    embedding_header: bool = True,
 ) -> None:
     """Ingest every version in manifest order with its manifest ID, so labels resolve."""
     for document in corpus.documents:
@@ -285,6 +290,7 @@ async def index_corpus(
             blobs=blobs,
             chunking=chunking,
             new_document_id=_fixed_id(document.id),
+            embedding_header=embedding_header,
         )
         await ingest(
             data=corpus.read(document),
@@ -301,6 +307,8 @@ async def run_retrieval_benchmark(
     *,
     k_values: Sequence[int] = (1, 3, 5, 10),
     embedding_model: str | None = None,
+    experiment: ExperimentConfig | None = None,
+    code_revision: str | None = None,
 ) -> BenchmarkReport:
     started_at = datetime.now(UTC)
     ks = sorted(set(k_values))
@@ -330,6 +338,8 @@ async def run_retrieval_benchmark(
             mean(r.top_score for r in results if not r.answerable and r.top_score is not None)
         ),
         results=results,
+        experiment=experiment,
+        code_revision=code_revision,
     )
 
 

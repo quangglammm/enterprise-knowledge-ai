@@ -1,0 +1,9 @@
+{
+  "version": "v2-packed800",
+  "corpus_manifest_sha256": "f6cb039690b5cb8ec62ed153ebe26ab62c5901f79edb1fa15d5519f1568e85d0",
+  "chunking": {
+    "max_chars": 800,
+    "overlap_chars": 100,
+    "pack_sections": true
+  }
+}

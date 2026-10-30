@@ -6,7 +6,12 @@ from enterprise_knowledge.domain.documents import DocumentStatus
 from enterprise_knowledge.domain.errors import DocumentNotFoundError, ModelRateLimitedError
 from enterprise_knowledge.domain.ids import DocumentId
 from enterprise_knowledge.ingestion.errors import CorruptDocumentError
-from enterprise_knowledge.ingestion.ingest import HEADER_SEPARATOR, blob_key, embedding_input
+from enterprise_knowledge.ingestion.ingest import (
+    HEADER_SEPARATOR,
+    IngestDocument,
+    blob_key,
+    embedding_input,
+)
 from tests.factories import TENANT, make_policy, make_principal
 from tests.unit.ingestion.conftest import Harness, fixture_bytes
 
@@ -32,6 +37,20 @@ async def test_embedding_input_carries_title_and_section(harness: Harness) -> No
     inputs = harness.embedder.document_inputs
     assert all(i.startswith("Quy chế nghỉ phép") for i in inputs)
     assert any("Điều 2. Số ngày nghỉ phép năm" in i for i in inputs)
+
+
+async def test_embedding_header_can_be_switched_off_for_experiments(harness: Harness) -> None:
+    ingest = IngestDocument(
+        documents=harness.store,
+        embedder=harness.embedder,
+        blobs=harness.blobs,
+        embedding_header=False,
+    )
+
+    result = await ingest(data=PDF, filename="leave.pdf", access=make_policy())
+
+    chunks = await harness.store.list_chunks(TENANT, result.document.id, 1)
+    assert harness.embedder.document_inputs == [c.text for c in chunks]
 
 
 def test_embedding_input_format() -> None:

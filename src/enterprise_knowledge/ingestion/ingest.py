@@ -64,6 +64,7 @@ class IngestDocument:
         new_document_id: Callable[[], DocumentId] = new_document_id,
         limits: IngestionLimits | None = None,
         chunking: ChunkingSettings | None = None,
+        embedding_header: bool = True,
     ) -> None:
         self._documents = documents
         self._embedder = embedder
@@ -72,6 +73,8 @@ class IngestDocument:
         self._new_id = new_document_id
         self._limits = limits or IngestionLimits()
         self._chunking = chunking or ChunkingSettings()
+        # Off only for the Week 4 experiment that measures the header (ADR-0006, ADR-0013).
+        self._embedding_header = embedding_header
 
     async def __call__(
         self,
@@ -184,7 +187,12 @@ class IngestDocument:
         for start in range(0, len(chunks), EMBED_BATCH_SIZE):
             batch = chunks[start : start + EMBED_BATCH_SIZE]
             vectors = await self._embedder.embed_documents(
-                [embedding_input(document.title, c.source.section, c.text) for c in batch]
+                [
+                    embedding_input(document.title, c.source.section, c.text)
+                    if self._embedding_header
+                    else c.text
+                    for c in batch
+                ]
             )
             embeddings.extend(
                 Embedding(
